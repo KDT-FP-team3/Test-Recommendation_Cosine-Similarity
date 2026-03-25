@@ -122,7 +122,125 @@ KEYWORD_ALIASES = {
     "심리": "기억상실",
     "생존자": "탈출",
     "블록버스터": "속편",
+    "블랙코미디": "블랙코미디",
+    "블랙 코미디": "블랙코미디",
+    "실존인물": "실존인물",
+    "실화": "실화바탕",
+    "실화바탕": "실화바탕",
+    "연쇄 살인": "연쇄살인",
+    "삼각관계": "삼각관계",
+    "삼각 관계": "삼각관계",
+    "첫사랑": "첫사랑",
+    "기억 상실": "기억상실",
+    "범죄조직": "범죄조직",
+    "범죄 조직": "범죄조직",
+    "독립영화": "독립영화",
+    "인디영화": "인디영화",
+    "인디": "인디영화",
 }
+
+
+# ===================================================================
+# 퍼지 매칭 헬퍼 (외부 의존성 없음)
+# ===================================================================
+
+# 흔한 한국어 오타 치환 규칙 (정규화 시 적용)
+_TYPO_SUBS = [
+    ("숀", "션"),       # 액숀 -> 액션
+    ("코메디", "코미디"),
+    ("호로", "호러"),
+    ("에니메", "애니메"),
+    ("에니", "애니"),
+    ("쓰릴러", "스릴러"),
+    ("멜로드라마", "멜로"),
+    ("어드벤쳐", "어드벤처"),
+    ("판타지아", "판타지"),
+    ("다큐맨터리", "다큐멘터리"),
+    ("다큐맨", "다큐멘"),
+    ("뮤지컬영화", "뮤지컬"),
+    ("로맨틱", "로맨스"),
+]
+
+
+def _normalize_korean(text):
+    """공백 제거 + 흔한 오타 치환으로 정규화."""
+    text = text.replace(" ", "").lower()
+    for old, new in _TYPO_SUBS:
+        text = text.replace(old, new)
+    return text
+
+
+def _decompose_hangul(ch):
+    """한글 음절을 초성/중성/종성 인덱스로 분해. 비한글은 ord 값 그대로."""
+    code = ord(ch)
+    if 0xAC00 <= code <= 0xD7A3:
+        offset = code - 0xAC00
+        jong = offset % 28
+        jung = (offset // 28) % 21
+        cho = offset // (28 * 21)
+        return (cho, jung, jong)
+    return (code,)
+
+
+def _to_jamo_seq(text):
+    """문자열을 자모 시퀀스(int 리스트)로 변환."""
+    seq = []
+    for ch in text:
+        seq.extend(_decompose_hangul(ch))
+    return seq
+
+
+def _jamo_edit_distance(a, b, max_dist=4):
+    """자모 시퀀스 기반 Levenshtein 편집 거리. max_dist 초과 시 조기 종료."""
+    sa, sb = _to_jamo_seq(a), _to_jamo_seq(b)
+    la, lb = len(sa), len(sb)
+    if abs(la - lb) > max_dist:
+        return max_dist + 1
+    # DP (메모리 절약: 2행)
+    prev = list(range(lb + 1))
+    for i in range(1, la + 1):
+        curr = [i] + [0] * lb
+        row_min = i
+        for j in range(1, lb + 1):
+            cost = 0 if sa[i - 1] == sb[j - 1] else 1
+            curr[j] = min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+            if curr[j] < row_min:
+                row_min = curr[j]
+        if row_min > max_dist:
+            return max_dist + 1
+        prev = curr
+    return prev[lb]
+
+
+def _get_fuzzy_threshold(token):
+    """토큰 길이에 따른 퍼지 매칭 임계값."""
+    syllables = sum(1 for c in token if 0xAC00 <= ord(c) <= 0xD7A3)
+    if syllables <= 2 or len(token) <= 3:
+        return 1   # 짧은 단어: 1자모만 허용 (공포 != 공부)
+    elif syllables <= 3 or len(token) <= 6:
+        return 2
+    else:
+        return 3
+
+
+def _fuzzy_match_aliases(token, alias_dict):
+    """자모 편집 거리 기반 퍼지 매칭. 가장 가까운 별칭 값 반환."""
+    if len(token) < 2:
+        return None
+    threshold = _get_fuzzy_threshold(token)
+    best_val = None
+    best_dist = threshold + 1
+    for alias_key, alias_val in alias_dict.items():
+        d = _jamo_edit_distance(token, alias_key, max_dist=threshold)
+        if d < best_dist:
+            best_dist = d
+            best_val = alias_val
+    return best_val if best_dist <= threshold else None
+
+
+# 정규화된 별칭 인덱스 (모듈 로드 시 1회 구축)
+_NORM_GENRE_ALIASES = {_normalize_korean(k): v for k, v in GENRE_ALIASES.items()}
+_NORM_KEYWORD_ALIASES = {_normalize_korean(k): v for k, v in KEYWORD_ALIASES.items()}
 
 
 class MovieSearchEngine:
@@ -218,22 +336,33 @@ class MovieSearchEngine:
         return results, parsed
 
     def _parse_query(self, text):
-        """텍스트에서 장르/키워드/수치 정보를 파싱한다."""
+        """텍스트에서 장르/키워드/수치 정보를 파싱한다.
+
+        4단계 매칭:
+          1) 단어별 정확 매칭 (GENRE_ALIASES, KEYWORD_ALIASES)
+          2) 부분 문자열 매칭 (복합어 대응)
+          3) 정규화 매칭 (띄어쓰기 제거 + 오타 치환)
+          4) 자모 퍼지 매칭 (편집 거리 기반, 미매칭 단어만)
+        """
         text_lower = text.lower()
         words = text_lower.split()
 
         genres = set()
         keywords = set()
+        fuzzy_corrections = []  # (원본, 보정값) 기록
 
-        # 단어별 매칭
+        # --- Pass 1: 단어별 정확 매칭 ---
+        matched_words = set()
         for word in words:
             word_clean = word.strip(",.!?()[]\"'")
             if word_clean in GENRE_ALIASES:
                 genres.add(GENRE_ALIASES[word_clean])
+                matched_words.add(word_clean)
             if word_clean in KEYWORD_ALIASES:
                 keywords.add(KEYWORD_ALIASES[word_clean])
+                matched_words.add(word_clean)
 
-        # 복합어 매칭 (2-3단어 조합)
+        # --- Pass 2: 부분 문자열 매칭 (복합어) ---
         for alias, genre in GENRE_ALIASES.items():
             if alias in text_lower:
                 genres.add(genre)
@@ -241,11 +370,41 @@ class MovieSearchEngine:
             if alias in text_lower:
                 keywords.add(kw)
 
+        # --- Pass 3: 정규화 매칭 (띄어쓰기 + 오타 치환) ---
+        text_norm = _normalize_korean(text_lower)
+        for alias_norm, genre in _NORM_GENRE_ALIASES.items():
+            if alias_norm in text_norm:
+                if genre not in genres:
+                    genres.add(genre)
+                    fuzzy_corrections.append((alias_norm, f"장르:{genre}"))
+        for alias_norm, kw in _NORM_KEYWORD_ALIASES.items():
+            if alias_norm in text_norm:
+                if kw not in keywords:
+                    keywords.add(kw)
+                    fuzzy_corrections.append((alias_norm, f"키워드:{kw}"))
+
+        # --- Pass 4: 자모 퍼지 매칭 (미매칭 단어만) ---
+        for word in words:
+            word_clean = word.strip(",.!?()[]\"'")
+            if word_clean in matched_words or len(word_clean) < 2:
+                continue
+            # 장르 퍼지
+            fuzzy_genre = _fuzzy_match_aliases(word_clean, GENRE_ALIASES)
+            if fuzzy_genre and fuzzy_genre not in genres:
+                genres.add(fuzzy_genre)
+                fuzzy_corrections.append((word_clean, f"장르:{fuzzy_genre}"))
+            # 키워드 퍼지
+            fuzzy_kw = _fuzzy_match_aliases(word_clean, KEYWORD_ALIASES)
+            if fuzzy_kw and fuzzy_kw not in keywords:
+                keywords.add(fuzzy_kw)
+                fuzzy_corrections.append((word_clean, f"키워드:{fuzzy_kw}"))
+
         return {
             "genres": list(genres),
             "keywords": list(keywords),
             "numeric_values": {},
             "original_text": text,
+            "fuzzy_corrections": fuzzy_corrections,
         }
 
     def _format_results(self, ranked, top_k, exclude_id=None):
@@ -317,6 +476,10 @@ def run_interactive_search(embedding, train_movies, test_movies=None):
                 print(f"  [파싱] 장르: {', '.join(info['genres'])}")
             if info.get("keywords"):
                 print(f"  [파싱] 키워드: {', '.join(info['keywords'])}")
+            if info.get("fuzzy_corrections"):
+                corrections = [f'"{orig}" -> {corrected}'
+                               for orig, corrected in info["fuzzy_corrections"]]
+                print(f"  [보정] {', '.join(corrections)}")
 
         print(f"\n검색 결과 (Top-{len(results)}, 방식: {search_type})")
         print("-" * 60)
