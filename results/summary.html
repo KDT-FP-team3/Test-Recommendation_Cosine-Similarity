@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 영화 추천 시스템 — 종합 보고서</title>
+    <style>
+        /* ── 라이트/다크 모드 공통 변수 ── */
+        :root {
+            --primary: #2C3E50;
+            --accent: #3498DB;
+            --success: #27AE60;
+            --warning: #E8A317;
+            --danger: #E74C3C;
+            --bg: #F5F6F8;
+            --card-bg: #FFFFFF;
+            --border: #D5D8DC;
+            --text: #1E2328;
+            --text-light: #4A5568;
+            --toc-bg: #FFFFFF;
+            --hover-bg: #EBF5FB;
+            --row-even: #F0F3F5;
+            --code-bg: #EDF2F7;
+            --embed-genre: #C0392B;
+            --embed-kw: #2471A3;
+            --embed-num: #1E8449;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --primary: #A8C6DF;
+                --accent: #5DADE2;
+                --success: #58D68D;
+                --warning: #F4D03F;
+                --danger: #EC7063;
+                --bg: #181A1E;
+                --card-bg: #22262C;
+                --border: #3A3F47;
+                --text: #D5DBE1;
+                --text-light: #9EAAB8;
+                --toc-bg: #1E2126;
+                --hover-bg: #2A3040;
+                --row-even: #272C33;
+                --code-bg: #2A2F38;
+                --embed-genre: #E74C3C;
+                --embed-kw: #3498DB;
+                --embed-num: #2ECC71;
+            }
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Malgun Gothic', 'Segoe UI', sans-serif;
+            background: var(--bg); color: var(--text);
+            line-height: 1.75; font-size: 15px;
+        }
+
+        /* ── 헤더 ── */
+        .header {
+            background: linear-gradient(135deg, #1A252F 0%, #2C3E50 100%);
+            color: #EAF0F6; padding: 50px 40px; text-align: center;
+        }
+        .header h1 { font-size: 2.2em; margin-bottom: 10px; letter-spacing: -0.5px; }
+        .header p { font-size: 1.05em; opacity: 0.85; }
+        .header .meta {
+            margin-top: 20px; display: flex; justify-content: center; gap: 20px;
+            flex-wrap: wrap;
+        }
+        .header .meta span {
+            background: rgba(255,255,255,0.13); padding: 6px 16px;
+            border-radius: 20px; font-size: 0.9em;
+        }
+
+        /* ── 네비게이션 ── */
+        .toc {
+            background: var(--toc-bg); border-bottom: 1px solid var(--border);
+            padding: 14px 40px; position: sticky; top: 0; z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .toc-inner {
+            max-width: 1200px; margin: 0 auto;
+            display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+        }
+        .toc a {
+            text-decoration: none; color: var(--text-light);
+            padding: 6px 13px; border-radius: 6px; font-size: 0.88em;
+            transition: all 0.2s;
+        }
+        .toc a:hover { background: var(--accent); color: #FFF; }
+
+        /* ── 컨텐츠 ── */
+        .content { max-width: 1200px; margin: 0 auto; padding: 30px 40px; }
+
+        .section {
+            background: var(--card-bg); border-radius: 12px;
+            border: 1px solid var(--border); padding: 35px;
+            margin-bottom: 28px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        }
+        .section h2 {
+            font-size: 1.45em; color: var(--primary);
+            border-bottom: 3px solid var(--accent);
+            padding-bottom: 10px; margin-bottom: 22px;
+        }
+        .section h3 {
+            font-size: 1.1em; color: var(--primary);
+            margin: 22px 0 12px; padding-left: 12px;
+            border-left: 4px solid var(--accent);
+        }
+        .section p { margin-bottom: 12px; }
+
+        /* ── 테이블 ── */
+        table {
+            width: 100%; border-collapse: collapse; margin: 14px 0;
+            font-size: 0.92em;
+        }
+        th {
+            background: #2C3E50; color: #EAF0F6;
+            padding: 10px 14px; text-align: center; font-weight: 600;
+        }
+        td {
+            padding: 9px 14px; border-bottom: 1px solid var(--border);
+            text-align: center;
+        }
+        tr:nth-child(even) { background: var(--row-even); }
+        tr:hover { background: var(--hover-bg); }
+        td:first-child { text-align: left; font-weight: 500; }
+
+        /* ── 파이프라인 ── */
+        .pipeline {
+            display: flex; align-items: center;
+            gap: 8px 0; flex-wrap: wrap; justify-content: center;
+            margin: 24px 0; padding: 10px 0;
+        }
+        .pipeline-step {
+            background: linear-gradient(135deg, var(--accent), #2980B9);
+            color: #FFF; padding: 14px 16px; border-radius: 10px;
+            text-align: center; min-width: 120px;
+            box-shadow: 0 2px 6px rgba(52,152,219,0.3);
+            margin: 6px 0;
+        }
+        .pipeline-step .step-num {
+            font-size: 0.85em; opacity: 0.85; display: block;
+            margin-bottom: 4px; font-weight: bold;
+        }
+        .pipeline-step .step-name {
+            font-weight: bold; font-size: 1.05em; display: block;
+        }
+        .pipeline-step .step-file {
+            font-size: 0.8em; opacity: 0.75; margin-top: 5px; display: block;
+        }
+        .pipeline-arrow {
+            font-size: 1.4em; color: var(--accent); padding: 0 6px;
+            font-weight: bold; line-height: 1;
+        }
+
+        /* ── 임베딩 바 ── */
+        .embed-bar {
+            display: flex; height: 42px; border-radius: 8px; overflow: hidden;
+            margin: 16px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+        }
+        .embed-bar div {
+            display: flex; align-items: center; justify-content: center;
+            color: #FFF; font-size: 0.85em; font-weight: bold;
+        }
+        .embed-genre { background: var(--embed-genre); flex: 17; }
+        .embed-keyword { background: var(--embed-kw); flex: 30; }
+        .embed-numeric { background: var(--embed-num); flex: 7; }
+
+        /* ── 크롤링 필드 테이블 ── */
+        .field-table td:nth-child(1) { width: 10%; }
+        .field-table td:nth-child(2) { width: 8%; text-align: center; }
+        .field-table td:nth-child(3) { width: 52%; font-size: 0.88em; word-break: break-word; }
+        .field-table td:nth-child(4) { width: 30%; }
+        .field-table th:nth-child(1) { width: 10%; }
+        .field-table th:nth-child(2) { width: 8%; }
+        .field-table th:nth-child(3) { width: 52%; }
+        .field-table th:nth-child(4) { width: 30%; }
+
+        /* ── 테스트 영화 카드 ── */
+        .movie-cards {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px; margin: 20px 0;
+        }
+        .movie-card {
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 18px; background: var(--card-bg);
+            transition: box-shadow 0.2s;
+        }
+        .movie-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .movie-card .title {
+            font-size: 1.05em; font-weight: bold; color: var(--primary);
+            margin-bottom: 8px;
+        }
+        .movie-card .title span {
+            font-size: 0.82em; color: var(--text-light); font-weight: normal;
+        }
+        .movie-card .genres {
+            display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px;
+        }
+        .movie-card .genres span {
+            color: #FFF; padding: 3px 10px; border-radius: 10px;
+            font-size: 0.82em; font-weight: 600;
+        }
+        .movie-card .attrs {
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 4px; font-size: 0.88em; color: var(--text-light);
+        }
+
+        /* ── 장르 색상 (config.py GENRE_COLORS 기반) ── */
+        .g-Action      { background: #E74C3C; }
+        .g-Adventure   { background: #E67E22; }
+        .g-Animation   { background: #2ECC71; }
+        .g-Comedy      { background: #D4AC0D; }
+        .g-Crime       { background: #8E44AD; }
+        .g-Drama       { background: #3498DB; }
+        .g-Fantasy     { background: #1ABC9C; }
+        .g-Horror      { background: #2C3E50; }
+        .g-Mystery     { background: #9B59B6; }
+        .g-Romance     { background: #C2185B; }
+        .g-Sci-Fi      { background: #00838F; }
+        .g-Thriller    { background: #6D4C41; }
+        .g-War         { background: #607D8B; }
+        .g-Musical     { background: #FF9800; }
+        .g-Documentary { background: #388E3C; }
+        .g-Family      { background: #E64A19; }
+        .g-History     { background: #757575; }
+
+        /* ── 메트릭 하이라이트 (3열) ── */
+        .metrics-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 16px; margin: 20px 0;
+        }
+        .metric-box {
+            text-align: center; padding: 20px 15px;
+            border-radius: 10px; border: 1px solid var(--border);
+            background: var(--card-bg);
+        }
+        .metric-box .value { font-size: 2em; font-weight: bold; display: block; }
+        .metric-box .label { font-size: 0.9em; color: var(--text-light); margin-top: 5px; }
+        .metric-green .value { color: var(--success); }
+        .metric-blue .value { color: var(--accent); }
+        .metric-orange .value { color: var(--warning); }
+        .metric-purple .value { color: #A569BD; }
+
+        /* ── 시각화 링크 (3열) ── */
+        .viz-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 16px; margin: 20px 0;
+        }
+        .viz-card {
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 22px; text-align: center;
+            background: var(--card-bg);
+            transition: all 0.2s;
+        }
+        .viz-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 4px 12px rgba(52,152,219,0.15);
+        }
+        .viz-card .icon {
+            font-size: 1.8em; margin-bottom: 8px; display: block;
+            color: var(--accent); font-weight: bold;
+        }
+        .viz-card h4 { color: var(--primary); margin-bottom: 8px; font-size: 1em; }
+        .viz-card p { font-size: 0.9em; color: var(--text-light); margin-bottom: 12px; }
+        .viz-card a {
+            display: inline-block; background: var(--accent); color: #FFF;
+            padding: 8px 20px; border-radius: 6px; text-decoration: none;
+            font-size: 0.9em; font-weight: bold;
+        }
+        .viz-card a:hover { opacity: 0.85; }
+
+        /* ── 수식 블록 ── */
+        .formula {
+            background: var(--code-bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 12px 18px; margin: 10px 0;
+            font-family: 'Consolas', 'Courier New', monospace; font-size: 0.92em;
+            text-align: center;
+        }
+
+        /* ── 뱃지 ── */
+        .badge {
+            display: inline-block; padding: 2px 10px; border-radius: 10px;
+            font-size: 0.82em; font-weight: bold; color: #FFF;
+        }
+        .badge-green { background: var(--success); }
+        .badge-red { background: var(--danger); }
+        .badge-blue { background: var(--accent); }
+        .badge-orange { background: #D68910; }
+
+        /* ── 리스트 ── */
+        ul.feature-list { list-style: none; padding: 0; }
+        ul.feature-list li {
+            padding: 6px 0 6px 24px; position: relative;
+        }
+        ul.feature-list li::before {
+            content: "▸"; position: absolute; left: 6px;
+            color: var(--accent); font-weight: bold;
+        }
+
+        /* ── 푸터 ── */
+        .footer {
+            text-align: center; padding: 30px;
+            color: var(--text-light); font-size: 0.9em;
+            border-top: 1px solid var(--border); margin-top: 20px;
+        }
+
+        /* ── 수식 섹션 ── */
+        .formula-block {
+            background: var(--code-bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 16px 20px; margin: 12px 0;
+            font-family: 'Consolas', 'Courier New', monospace; font-size: 0.92em;
+        }
+        .formula-block .formula-title {
+            font-family: 'Malgun Gothic', sans-serif; font-weight: bold;
+            color: var(--primary); margin-bottom: 8px; font-size: 0.95em;
+        }
+        .formula-block .formula-desc {
+            font-family: 'Malgun Gothic', sans-serif; font-size: 0.85em;
+            color: var(--text-light); margin-top: 6px;
+        }
+
+        /* ── 흐름도 ── */
+        .flow-container {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 6px; margin: 20px 0;
+        }
+        .flow-row {
+            display: flex; align-items: center; gap: 0;
+            justify-content: center; flex-wrap: wrap;
+            margin: 4px 0;
+        }
+        .flow-box {
+            background: linear-gradient(135deg, var(--accent), #2980B9);
+            color: #FFF; padding: 14px 20px; border-radius: 8px;
+            text-align: center; min-width: 130px; font-size: 0.88em;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        .flow-box-alt {
+            background: linear-gradient(135deg, var(--success), #1E8449);
+            color: #FFF; padding: 14px 20px; border-radius: 8px;
+            text-align: center; min-width: 130px; font-size: 0.88em;
+        }
+        .flow-box-warn {
+            background: linear-gradient(135deg, var(--warning), #D68910);
+            color: #FFF; padding: 14px 20px; border-radius: 8px;
+            text-align: center; min-width: 130px; font-size: 0.88em;
+        }
+        .flow-arrow { font-size: 1.4em; color: var(--accent); padding: 0 10px; font-weight: bold; }
+        .flow-arrow-down { font-size: 1.4em; color: var(--accent); padding: 8px 0; font-weight: bold; }
+
+        /* ── 반응형 ── */
+        @media (max-width: 960px) {
+            .viz-grid, .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 640px) {
+            .content { padding: 15px; }
+            .section { padding: 20px; }
+            .header { padding: 30px 20px; }
+            .header h1 { font-size: 1.5em; }
+            .pipeline { flex-direction: column; gap: 6px; }
+            .pipeline-arrow { transform: rotate(90deg); padding: 4px 0; }
+            .viz-grid, .metrics-grid { grid-template-columns: 1fr; }
+            .movie-cards { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 헤더 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="header">
+    <h1>AI 영화 추천 시스템 &mdash; 종합 보고서</h1>
+    <p>코사인 유사도 기반 콘텐츠 필터링 추천 엔진 &middot; 민감도 분석 &middot; 수식 체계</p>
+    <div class="meta">
+        <span>Training 10,857편 (1980~2026.03)</span>
+        <span>Test 5편</span>
+        <span>54D Embedding</span>
+        <span>KMeans k=8</span>
+        <span>27 Sensitivity Combos</span>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- TOC -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<nav class="toc">
+    <div class="toc-inner">
+        <a href="#s1">1. 개요</a>
+        <a href="#s2">2. 파이프라인</a>
+        <a href="#s3">3. 임베딩</a>
+        <a href="#s4">4. 데이터</a>
+        <a href="#s5">5. 테스트 영화</a>
+        <a href="#s6">6. 군집화</a>
+        <a href="#s7">7. 추천 알고리즘</a>
+        <a href="#s8">8. 평가 메트릭</a>
+        <a href="#s9">9. 평가 결과</a>
+        <a href="#s10">10. 민감도 분석</a>
+        <a href="#s11">11. 수식 체계</a>
+        <a href="#s12">12. 연산 흐름도</a>
+        <a href="#s13">13. 시각화</a>
+        <a href="#s14">14. 설정</a>
+        <a href="#reference">15. 참고사항</a>
+    </div>
+</nav>
+
+<div class="content">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 1. 개요 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s1">
+    <h2>1. 개요</h2>
+    <p>본 시스템은 영화 메타데이터를 54차원 벡터로 변환하고, 코사인 유사도 기반 콘텐츠 필터링을 통해 유사 영화를 추천하는 AI 파이프라인이다. 10,857편의 학습 데이터(1980~2026.03)를 기반으로 5편의 테스트 영화에 대한 추천을 생성하고, 27가지 가중치 조합의 민감도 분석을 수행하여 시스템 안정성을 검증한다.</p>
+
+    <h3>기술 스택</h3>
+    <table>
+        <tr><th>구성 요소</th><th>기술</th><th>역할</th></tr>
+        <tr><td>언어</td><td>Python 3.10+</td><td>전체 파이프라인 구현</td></tr>
+        <tr><td>벡터 연산</td><td>PyTorch (GPU/CPU)</td><td>배치 코사인 유사도, 텐서 연산</td></tr>
+        <tr><td>클러스터링</td><td>scikit-learn KMeans</td><td>k=8 군집화, StandardScaler</td></tr>
+        <tr><td>차원 축소</td><td>scikit-learn PCA</td><td>2D/3D 시각화용 투영</td></tr>
+        <tr><td>LLM 설명</td><td>Gemini 2.0 Flash</td><td>추천 이유 자연어 생성</td></tr>
+        <tr><td>시각화</td><td>Plotly.js</td><td>인터랙티브 HTML 차트</td></tr>
+        <tr><td>데이터 수집</td><td>TMDb API + BeautifulSoup</td><td>영화 메타데이터 크롤링</td></tr>
+    </table>
+
+    <h3>핵심 수치</h3>
+    <div class="metrics-grid">
+        <div class="metric-box metric-blue"><span class="value">10,857</span><span class="label">학습 영화 (1980~2026.03)</span></div>
+        <div class="metric-box metric-green"><span class="value">54D</span><span class="label">임베딩 차원 (17+30+7)</span></div>
+        <div class="metric-box metric-orange"><span class="value">27</span><span class="label">민감도 가중치 조합</span></div>
+        <div class="metric-box metric-purple"><span class="value">5</span><span class="label">테스트 영화</span></div>
+        <div class="metric-box metric-blue"><span class="value">k=8</span><span class="label">KMeans 클러스터</span></div>
+        <div class="metric-box metric-green"><span class="value">Top-20</span><span class="label">추천 결과 수</span></div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 2. 파이프라인 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s2">
+    <h2>2. 파이프라인</h2>
+    <p>전체 시스템은 6단계의 순차 파이프라인으로 구성된다. 각 단계는 독립 모듈로 분리되어 있으며, CLI 명령으로 개별 또는 일괄 실행이 가능하다.</p>
+
+    <div class="pipeline">
+        <div class="pipeline-step">
+            <span class="step-num">Stage 1</span>
+            <span class="step-name">데이터 로드</span>
+            <span class="step-file">data_loader.py</span>
+        </div>
+        <span class="pipeline-arrow">&rarr;</span>
+        <div class="pipeline-step">
+            <span class="step-num">Stage 2</span>
+            <span class="step-name">임베딩 생성</span>
+            <span class="step-file">embedding.py</span>
+        </div>
+        <span class="pipeline-arrow">&rarr;</span>
+        <div class="pipeline-step">
+            <span class="step-num">Stage 3</span>
+            <span class="step-name">군집화</span>
+            <span class="step-file">clustering.py</span>
+        </div>
+        <span class="pipeline-arrow">&rarr;</span>
+        <div class="pipeline-step">
+            <span class="step-num">Stage 4</span>
+            <span class="step-name">차원 축소</span>
+            <span class="step-file">reduction.py</span>
+        </div>
+        <span class="pipeline-arrow">&rarr;</span>
+        <div class="pipeline-step">
+            <span class="step-num">Stage 5</span>
+            <span class="step-name">추천</span>
+            <span class="step-file">recommender.py</span>
+        </div>
+        <span class="pipeline-arrow">&rarr;</span>
+        <div class="pipeline-step">
+            <span class="step-num">Stage 6</span>
+            <span class="step-name">평가</span>
+            <span class="step-file">evaluator.py</span>
+        </div>
+    </div>
+
+    <h3>파이프라인 흐름 상세</h3>
+    <table>
+        <tr><th>단계</th><th>입력</th><th>처리</th><th>출력</th></tr>
+        <tr><td>1. 데이터 수집</td><td>TMDb API, 웹 크롤링</td><td>24개 필드 추출, 결측값 처리</td><td>movies_train.json (10,857편)</td></tr>
+        <tr><td>2. 벡터 변환</td><td>영화 JSON 데이터</td><td>장르 원핫 + 키워드 이진 + 수치 정규화</td><td>54D 벡터 (raw_vectors)</td></tr>
+        <tr><td>3. 군집화</td><td>raw_vectors</td><td>StandardScaler &rarr; KMeans(k=8)</td><td>클러스터 레이블 (0~7)</td></tr>
+        <tr><td>4. 추천 생성</td><td>테스트 벡터 + 학습 벡터</td><td>코사인 유사도 &rarr; Top-20</td><td>추천 목록 + Gemini 설명</td></tr>
+        <tr><td>5. 평가</td><td>추천 결과</td><td>정량/정성 메트릭 계산</td><td>평가 점수 + 리포트</td></tr>
+        <tr><td>6. 시각화</td><td>벡터, 클러스터, 평가 결과</td><td>Plotly 차트 생성</td><td>6개 인터랙티브 HTML</td></tr>
+    </table>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 3. 임베딩 구조 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s3">
+    <h2>3. 임베딩 구조</h2>
+    <p>각 영화는 54차원 밀집 벡터로 표현된다. 벡터는 3개 블록으로 구성되며, 각 블록에 독립적인 가중치(W<sub>g</sub>, W<sub>k</sub>, W<sub>n</sub>)를 적용하여 민감도 분석 시 조절한다.</p>
+
+    <div class="embed-bar">
+        <div class="embed-genre">Genre 17D</div>
+        <div class="embed-keyword">Keyword 30D</div>
+        <div class="embed-numeric">Numeric 7D</div>
+    </div>
+
+    <div class="formula">
+        V = [genre_onehot(17) &times; W<sub>g</sub> &nbsp;|&nbsp; keyword_binary(30) &times; W<sub>k</sub> &nbsp;|&nbsp; numeric(7) &times; W<sub>n</sub>]
+    </div>
+
+    <h3>Genre Block (17D)</h3>
+    <p>17개 장르에 대한 원핫 인코딩. 다중 장르인 경우 해당 차원이 모두 1로 설정된다.</p>
+    <table>
+        <tr><th>#</th><th>장르</th><th>#</th><th>장르</th><th>#</th><th>장르</th></tr>
+        <tr><td>0</td><td>Action</td><td>6</td><td>Fantasy</td><td>12</td><td>War</td></tr>
+        <tr><td>1</td><td>Adventure</td><td>7</td><td>Horror</td><td>13</td><td>Musical</td></tr>
+        <tr><td>2</td><td>Animation</td><td>8</td><td>Mystery</td><td>14</td><td>Documentary</td></tr>
+        <tr><td>3</td><td>Comedy</td><td>9</td><td>Romance</td><td>15</td><td>Family</td></tr>
+        <tr><td>4</td><td>Crime</td><td>10</td><td>Sci-Fi</td><td>16</td><td>History</td></tr>
+        <tr><td>5</td><td>Drama</td><td>11</td><td>Thriller</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    </table>
+
+    <h3>Keyword Block (30D)</h3>
+    <p>영화 키워드를 30개의 대표 키워드 사전에 매핑한 이진 벡터. 키워드 존재 시 1, 부재 시 0.</p>
+
+    <h3>Numeric Block (7D)</h3>
+    <p>연속 수치 속성 7개를 [0, 1] 범위로 정규화하여 사용한다.</p>
+    <table>
+        <tr><th>#</th><th>속성</th><th>범위</th><th>설명</th></tr>
+        <tr><td>0</td><td>mood</td><td>0.0 ~ 1.0</td><td>분위기 (어두움 &rarr; 밝음)</td></tr>
+        <tr><td>1</td><td>tempo</td><td>0.0 ~ 1.0</td><td>전개 속도 (느림 &rarr; 빠름)</td></tr>
+        <tr><td>2</td><td>visual</td><td>0.0 ~ 1.0</td><td>시각적 화려함</td></tr>
+        <tr><td>3</td><td>star_power</td><td>0.0 ~ 1.0</td><td>배우 인지도</td></tr>
+        <tr><td>4</td><td>budget_level</td><td>0.0 ~ 1.0</td><td>예산 규모</td></tr>
+        <tr><td>5</td><td>vote_average</td><td>0.0 ~ 1.0</td><td>평균 평점 (10점 기준 정규화)</td></tr>
+        <tr><td>6</td><td>popularity</td><td>0.0 ~ 1.0</td><td>인기도 (log 정규화)</td></tr>
+    </table>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 4. 데이터 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s4">
+    <h2>4. 데이터</h2>
+    <p>TMDb API와 웹 크롤링을 통해 수집한 영화 데이터는 총 24개 필드로 구성된다. 학습 데이터는 1980년부터 2026년 3월까지의 10,857편이다.</p>
+
+    <h3>24개 데이터 필드</h3>
+    <table class="field-table">
+        <tr><th>필드명</th><th>타입</th><th>설명</th><th>결측값 처리</th></tr>
+        <tr><td>id</td><td>int</td><td>TMDb 고유 ID</td><td>필수 (없으면 제외)</td></tr>
+        <tr><td>title</td><td>str</td><td>원제 (영문)</td><td>필수</td></tr>
+        <tr><td>title_ko</td><td>str</td><td>한국어 제목</td><td>원제로 대체</td></tr>
+        <tr><td>year</td><td>int</td><td>개봉 연도</td><td>필수 (1980~2026)</td></tr>
+        <tr><td>country</td><td>str</td><td>제작 국가 코드</td><td>"XX" 기본값</td></tr>
+        <tr><td>genres</td><td>list</td><td>장르 목록 (17종)</td><td>빈 리스트</td></tr>
+        <tr><td>keywords</td><td>list</td><td>키워드 목록</td><td>빈 리스트</td></tr>
+        <tr><td>overview</td><td>str</td><td>줄거리 요약</td><td>빈 문자열</td></tr>
+        <tr><td>tagline</td><td>str</td><td>태그라인</td><td>빈 문자열</td></tr>
+        <tr><td>runtime</td><td>int</td><td>상영 시간 (분)</td><td>중앙값 대체</td></tr>
+        <tr><td>vote_average</td><td>float</td><td>평균 평점 (0~10)</td><td>0.0</td></tr>
+        <tr><td>vote_count</td><td>int</td><td>투표 수</td><td>0</td></tr>
+        <tr><td>popularity</td><td>float</td><td>TMDb 인기 지수</td><td>0.0</td></tr>
+        <tr><td>budget</td><td>int</td><td>제작 예산 (USD)</td><td>0</td></tr>
+        <tr><td>revenue</td><td>int</td><td>흥행 수입 (USD)</td><td>0</td></tr>
+        <tr><td>director</td><td>str</td><td>감독명</td><td>"Unknown"</td></tr>
+        <tr><td>cast</td><td>list</td><td>주요 출연진</td><td>빈 리스트</td></tr>
+        <tr><td>mood</td><td>float</td><td>분위기 점수</td><td>0.5 (중립)</td></tr>
+        <tr><td>tempo</td><td>float</td><td>전개 속도</td><td>0.5</td></tr>
+        <tr><td>visual</td><td>float</td><td>시각적 화려함</td><td>0.5</td></tr>
+        <tr><td>star_power</td><td>float</td><td>배우 인지도</td><td>0.3</td></tr>
+        <tr><td>budget_level</td><td>float</td><td>예산 수준</td><td>0.3</td></tr>
+        <tr><td>poster_path</td><td>str</td><td>포스터 이미지 경로</td><td>null</td></tr>
+        <tr><td>backdrop_path</td><td>str</td><td>배경 이미지 경로</td><td>null</td></tr>
+    </table>
+
+    <h3>학습 데이터 구성</h3>
+    <p>총 10,857편의 영화 데이터를 학습 세트로 사용한다. 초기 테스트 영화 7편 중 2편(Heartman, Project Hail Mary)은 개봉 확정 후 학습 데이터로 이동하였다.</p>
+    <table>
+        <tr><th>구분</th><th>수량</th><th>범위</th><th>비고</th></tr>
+        <tr><td>학습 데이터</td><td>10,857편</td><td>1980 ~ 2026.03</td><td>movies_train.json</td></tr>
+        <tr><td>테스트 데이터</td><td>5편</td><td>2026</td><td>movies_test.json</td></tr>
+        <tr><td>학습 이동</td><td>2편</td><td>2026</td><td>Heartman (02-11), Project Hail Mary (03-15)</td></tr>
+    </table>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 5. 테스트 영화 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s5">
+    <h2>5. 테스트 영화</h2>
+    <p>2026년 개봉 예정인 5편의 영화를 테스트 세트로 선정하였다. 다양한 장르와 스타일을 포함하도록 구성하였다.</p>
+    <p style="color: var(--text-light); font-size: 0.9em;">* 참고: 초기 7편 중 Heartman (2026-02-11 개봉)과 Project Hail Mary (2026-03-15 개봉)은 개봉 확정 후 학습 데이터(10,857편)로 편입되었다.</p>
+
+    <div class="movie-cards">
+        <!-- Iron Lung -->
+        <div class="movie-card">
+            <div class="title">Iron Lung <span>2026 | US</span></div>
+            <div class="genres">
+                <span class="g-Sci-Fi">Sci-Fi</span>
+                <span class="g-Horror">Horror</span>
+            </div>
+            <div class="attrs">
+                <span>mood: 0.95</span><span>tempo: 0.40</span>
+                <span>visual: 0.70</span><span>star_power: 0.30</span>
+                <span>budget: 0.15</span>
+            </div>
+            <p style="font-size:0.82em; color:var(--text-light); margin-top:8px;">KW: survival, space, psychological, apocalypse</p>
+        </div>
+
+        <!-- HUMINT -->
+        <div class="movie-card">
+            <div class="title">HUMINT <span>2026 | KR</span></div>
+            <div class="genres">
+                <span class="g-Action">Action</span>
+                <span class="g-Thriller">Thriller</span>
+            </div>
+            <div class="attrs">
+                <span>mood: 0.75</span><span>tempo: 0.85</span>
+                <span>visual: 0.60</span><span>star_power: 0.65</span>
+                <span>budget: 0.50</span>
+            </div>
+            <p style="font-size:0.82em; color:var(--text-light); margin-top:8px;">KW: spy, conspiracy, war, politics</p>
+        </div>
+
+        <!-- Nuremberg -->
+        <div class="movie-card">
+            <div class="title">Nuremberg <span>2026 | US</span></div>
+            <div class="genres">
+                <span class="g-Drama">Drama</span>
+                <span class="g-History">History</span>
+                <span class="g-Thriller">Thriller</span>
+            </div>
+            <div class="attrs">
+                <span>mood: 0.85</span><span>tempo: 0.45</span>
+                <span>visual: 0.55</span><span>star_power: 0.80</span>
+                <span>budget: 0.50</span>
+            </div>
+            <p style="font-size:0.82em; color:var(--text-light); margin-top:8px;">KW: war, historical, psychological, politics</p>
+        </div>
+
+        <!-- Peaky Blinders -->
+        <div class="movie-card">
+            <div class="title">Peaky Blinders: The Immortal Man <span>2026 | UK</span></div>
+            <div class="genres">
+                <span class="g-Crime">Crime</span>
+                <span class="g-Drama">Drama</span>
+                <span class="g-History">History</span>
+            </div>
+            <div class="attrs">
+                <span>mood: 0.85</span><span>tempo: 0.65</span>
+                <span>visual: 0.75</span><span>star_power: 0.85</span>
+                <span>budget: 0.65</span>
+            </div>
+            <p style="font-size:0.82em; color:var(--text-light); margin-top:8px;">KW: conspiracy, revenge, historical, politics</p>
+        </div>
+
+        <!-- Ready or Not 2 -->
+        <div class="movie-card">
+            <div class="title">Ready or Not 2 <span>2026 | US</span></div>
+            <div class="genres">
+                <span class="g-Comedy">Comedy</span>
+                <span class="g-Horror">Horror</span>
+                <span class="g-Thriller">Thriller</span>
+            </div>
+            <div class="attrs">
+                <span>mood: 0.65</span><span>tempo: 0.80</span>
+                <span>visual: 0.55</span><span>star_power: 0.50</span>
+                <span>budget: 0.30</span>
+            </div>
+            <p style="font-size:0.82em; color:var(--text-light); margin-top:8px;">KW: survival, comedy, family, psychological</p>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 6. 군집화 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s6">
+    <h2>6. 군집화</h2>
+    <p>StandardScaler로 정규화한 54D 벡터에 KMeans(k=8)를 적용하여 영화를 8개 군집으로 분류한다. 클러스터 정보는 추천 결과의 다양성 분석과 시각화에 활용된다.</p>
+
+    <div class="formula">
+        StandardScaler &rarr; KMeans(n_clusters=8, n_init=10, max_iter=300, tol=1e-6)
+    </div>
+
+    <h3>클러스터 특성</h3>
+    <table>
+        <tr><th>Cluster</th><th>주요 장르</th><th>특성 요약</th><th>영화 수 (예상)</th></tr>
+        <tr><td>0</td><td>Drama, Romance</td><td>감성적 드라마, 로맨스 중심</td><td>~1,400</td></tr>
+        <tr><td>1</td><td>Action, Adventure</td><td>고예산 액션 블록버스터</td><td>~1,500</td></tr>
+        <tr><td>2</td><td>Comedy, Family</td><td>가벼운 코미디, 가족 영화</td><td>~1,300</td></tr>
+        <tr><td>3</td><td>Horror, Thriller</td><td>공포/스릴러, 어두운 분위기</td><td>~1,200</td></tr>
+        <tr><td>4</td><td>Sci-Fi, Fantasy</td><td>SF/판타지, 높은 시각 효과</td><td>~1,100</td></tr>
+        <tr><td>5</td><td>Crime, Mystery</td><td>범죄/미스터리, 심리극</td><td>~1,300</td></tr>
+        <tr><td>6</td><td>History, War</td><td>역사/전쟁 드라마</td><td>~1,100</td></tr>
+        <tr><td>7</td><td>Documentary, Animation</td><td>다큐멘터리, 애니메이션 등</td><td>~1,857</td></tr>
+    </table>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 7. 추천 알고리즘 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s7">
+    <h2>7. 추천 알고리즘</h2>
+    <p>테스트 영화의 54D 벡터와 학습 데이터 전체의 벡터 간 코사인 유사도를 GPU 배치 연산으로 계산하고, 상위 K개(기본 20)를 추천 결과로 반환한다.</p>
+
+    <h3>코사인 유사도 계산</h3>
+    <div class="formula">
+        cos_sim(A, B) = (A &middot; B) / (||A|| &times; ||B||)
+    </div>
+    <p>PyTorch 텐서 연산을 통해 테스트 벡터 Q와 학습 행렬 T 간의 배치 유사도를 한 번에 계산한다.</p>
+    <div class="formula">
+        S = normalize(Q) &times; normalize(T)<sup>T</sup>
+    </div>
+
+    <h3>Top-K 선택</h3>
+    <p>유사도 행렬 S에서 각 테스트 영화별로 상위 20개를 선택한다. 동일 유사도인 경우 인기도(popularity)가 높은 영화를 우선한다.</p>
+
+    <h3>추천 설명 생성</h3>
+    <p>Gemini 2.0 Flash를 활용하여 각 추천 영화에 대해 "왜 이 영화가 유사한지"를 한국어 자연어로 설명한다. 장르 일치, 키워드 중복, 수치 속성 유사성 등을 종합하여 3~5문장의 설명을 생성한다.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 8. 평가 메트릭 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s8">
+    <h2>8. 평가 메트릭</h2>
+    <p>추천 결과의 품질을 정량적, 정성적으로 평가하기 위해 4가지 핵심 메트릭을 사용한다.</p>
+
+    <h3>정량 메트릭</h3>
+    <table>
+        <tr><th>메트릭</th><th>수식</th><th>범위</th><th>의미</th></tr>
+        <tr><td>avg_similarity</td><td>mean(sim<sub>1</sub>..sim<sub>K</sub>)</td><td>0~1</td><td>추천 영화들의 평균 유사도</td></tr>
+        <tr><td>genre_precision</td><td>장르 일치 수 / K</td><td>0~1</td><td>장르 매칭 비율</td></tr>
+        <tr><td>keyword_precision</td><td>키워드 일치 수 / K</td><td>0~1</td><td>키워드 매칭 비율</td></tr>
+        <tr><td>diversity</td><td>mean(1 - cos_sim(r<sub>i</sub>, r<sub>j</sub>))</td><td>0~1</td><td>추천 결과 내 다양성</td></tr>
+    </table>
+
+    <h3>적정 기준치</h3>
+    <table>
+        <tr><th>메트릭</th><th>양호</th><th>보통</th><th>미흡</th></tr>
+        <tr><td>avg_similarity</td><td><span class="badge badge-green">&ge; 0.75</span></td><td><span class="badge badge-orange">0.60 ~ 0.74</span></td><td><span class="badge badge-red">&lt; 0.60</span></td></tr>
+        <tr><td>genre_precision</td><td><span class="badge badge-green">&ge; 0.70</span></td><td><span class="badge badge-orange">0.50 ~ 0.69</span></td><td><span class="badge badge-red">&lt; 0.50</span></td></tr>
+        <tr><td>keyword_precision</td><td><span class="badge badge-green">&ge; 0.50</span></td><td><span class="badge badge-orange">0.30 ~ 0.49</span></td><td><span class="badge badge-red">&lt; 0.30</span></td></tr>
+        <tr><td>diversity</td><td><span class="badge badge-green">0.30 ~ 0.60</span></td><td><span class="badge badge-orange">0.20 ~ 0.29</span></td><td><span class="badge badge-red">&lt; 0.20 or &gt; 0.70</span></td></tr>
+    </table>
+
+    <h3>정성 평가</h3>
+    <p>Gemini 2.0 Flash가 생성한 추천 설명의 논리적 일관성, 구체성, 한국어 자연스러움을 수동으로 검토한다. 각 설명이 실제 벡터 유사도 결과와 일치하는지를 확인하여 LLM 환각(hallucination) 여부를 점검한다.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 9. 평가 결과 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s9">
+    <h2>9. 평가 결과</h2>
+    <p>5편의 테스트 영화에 대한 기본 가중치(W<sub>g</sub>=1.0, W<sub>k</sub>=1.0, W<sub>n</sub>=1.0) 기준 평가 결과이다.</p>
+
+    <table>
+        <tr><th>영화</th><th>avg_similarity</th><th>genre_precision</th><th>keyword_precision</th><th>diversity</th></tr>
+        <tr><td>Iron Lung</td><td>0.78</td><td>0.75</td><td>0.55</td><td>0.42</td></tr>
+        <tr><td>HUMINT</td><td>0.82</td><td>0.85</td><td>0.60</td><td>0.38</td></tr>
+        <tr><td>Nuremberg</td><td>0.80</td><td>0.80</td><td>0.50</td><td>0.45</td></tr>
+        <tr><td>Peaky Blinders</td><td>0.81</td><td>0.80</td><td>0.55</td><td>0.40</td></tr>
+        <tr><td>Ready or Not 2</td><td>0.76</td><td>0.70</td><td>0.45</td><td>0.48</td></tr>
+    </table>
+
+    <div class="metrics-grid">
+        <div class="metric-box metric-green"><span class="value">0.794</span><span class="label">평균 avg_similarity</span></div>
+        <div class="metric-box metric-blue"><span class="value">0.78</span><span class="label">평균 genre_precision</span></div>
+        <div class="metric-box metric-orange"><span class="value">0.53</span><span class="label">평균 keyword_precision</span></div>
+        <div class="metric-box metric-purple"><span class="value">0.426</span><span class="label">평균 diversity</span></div>
+        <div class="metric-box metric-green"><span class="value">5/5</span><span class="label">양호 판정 (similarity)</span></div>
+        <div class="metric-box metric-blue"><span class="value">5/5</span><span class="label">양호 판정 (genre)</span></div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 10. 민감도 분석 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s10">
+    <h2>10. 민감도 분석</h2>
+    <p>임베딩 가중치 변화에 따른 추천 결과의 안정성을 검증하기 위해, 3개 가중치(W<sub>g</sub>, W<sub>k</sub>, W<sub>n</sub>)를 각각 3단계(상/중/하)로 조합한 27가지 시나리오에 대해 전체 파이프라인을 반복 실행한다.</p>
+
+    <h3>27가지 가중치 조합</h3>
+    <p>각 가중치는 상(1.5), 중(1.0), 하(0.5)의 3단계를 가지며, 3개 가중치의 모든 조합은 3<sup>3</sup> = 27가지이다.</p>
+    <table>
+        <tr><th>수준</th><th>레이블</th><th>값</th><th>의미</th></tr>
+        <tr><td>상</td><td>High</td><td>1.5</td><td>해당 블록의 영향력을 50% 증가</td></tr>
+        <tr><td>중</td><td>Mid</td><td>1.0</td><td>기본값 (변화 없음)</td></tr>
+        <tr><td>하</td><td>Low</td><td>0.5</td><td>해당 블록의 영향력을 50% 감소</td></tr>
+    </table>
+
+    <div class="formula">
+        V<sub>variant</sub> = [genre(17) &times; W<sub>g</sub> &nbsp;|&nbsp; keyword(30) &times; W<sub>k</sub> &nbsp;|&nbsp; numeric(7) &times; W<sub>n</sub>]<br>
+        (W<sub>g</sub>, W<sub>k</sub>, W<sub>n</sub>) &isin; {0.5, 1.0, 1.5}<sup>3</sup> &rarr; 27 combos
+    </div>
+
+    <h3>테스트 입력 (10건)</h3>
+    <p>민감도 분석은 5편의 테스트 영화(벡터 기반)와 5개의 자유 텍스트 쿼리를 입력으로 사용한다.</p>
+
+    <table>
+        <tr><th>#</th><th>유형</th><th>입력</th></tr>
+        <tr><td>1</td><td>영화</td><td>Iron Lung</td></tr>
+        <tr><td>2</td><td>영화</td><td>HUMINT</td></tr>
+        <tr><td>3</td><td>영화</td><td>Nuremberg</td></tr>
+        <tr><td>4</td><td>영화</td><td>Peaky Blinders: The Immortal Man</td></tr>
+        <tr><td>5</td><td>영화</td><td>Ready or Not 2</td></tr>
+        <tr><td>6</td><td>텍스트</td><td>어두운 분위기의 SF 우주 생존 영화</td></tr>
+        <tr><td>7</td><td>텍스트</td><td>밝은 로맨틱 코미디 사랑 이야기</td></tr>
+        <tr><td>8</td><td>텍스트</td><td>빠른 전개의 첩보 액션 스파이 스릴러</td></tr>
+        <tr><td>9</td><td>텍스트</td><td>역사적 전쟁 드라마 심리극</td></tr>
+        <tr><td>10</td><td>텍스트</td><td>화려한 블록버스터 판타지 모험 마법</td></tr>
+    </table>
+
+    <h3>4대 민감도 메트릭</h3>
+    <p>각 27가지 조합에 대해 기본 조합(1.0, 1.0, 1.0) 대비 변화를 측정하는 4가지 메트릭을 산출한다.</p>
+    <table>
+        <tr><th>메트릭</th><th>수식</th><th>범위</th><th>의미</th></tr>
+        <tr><td>avg_similarity</td><td>mean(sim<sub>1</sub>..sim<sub>K</sub>)</td><td>0~1</td><td>해당 조합의 추천 평균 유사도</td></tr>
+        <tr><td>overlap</td><td>|baseline &cap; variant| / 20</td><td>0~1</td><td>기본 조합 대비 추천 목록 중복률</td></tr>
+        <tr><td>spearman</td><td>1 - 6&Sigma;d<sub>i</sub><sup>2</sup> / (n(n<sup>2</sup>-1))</td><td>-1~1</td><td>순위 상관계수 (순위 변동 정도)</td></tr>
+        <tr><td>reliability</td><td>std(per_query_similarities)</td><td>0~</td><td>쿼리 간 유사도 표준편차 (낮을수록 안정)</td></tr>
+    </table>
+
+    <h3>4개 차트 설명</h3>
+    <table>
+        <tr><th>차트</th><th>X축</th><th>Y축</th><th>해석</th></tr>
+        <tr><td>avg_similarity 분포</td><td>27 조합</td><td>평균 유사도</td><td>가중치 변화에 따른 유사도 변동 폭</td></tr>
+        <tr><td>overlap 분포</td><td>27 조합</td><td>중복률</td><td>추천 목록의 일관성 (높을수록 안정)</td></tr>
+        <tr><td>spearman 분포</td><td>27 조합</td><td>순위 상관</td><td>순위 변동 정도 (1.0에 가까울수록 안정)</td></tr>
+        <tr><td>reliability 분포</td><td>27 조합</td><td>표준편차</td><td>쿼리 간 편차 (낮을수록 안정)</td></tr>
+    </table>
+
+    <h3>27가지 조합 상세표</h3>
+    <p>아래 표는 모든 27가지 조합의 메트릭 값을 정리한 것이다. 배경색은 overlap 기준 안정성을 나타낸다: <span class="badge badge-green">양호 (&ge;0.70)</span> <span class="badge badge-orange">보통 (0.50~0.69)</span> <span class="badge badge-red">미흡 (&lt;0.50)</span></p>
+    <table>
+        <tr><th>#</th><th>W<sub>g</sub></th><th>W<sub>k</sub></th><th>W<sub>n</sub></th><th>avg_sim</th><th>overlap</th><th>spearman</th><th>reliability</th></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>1</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.81</td><td>0.85</td><td>0.91</td><td>0.03</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>2</td><td>0.5</td><td>0.5</td><td>1.0</td><td>0.79</td><td>0.78</td><td>0.86</td><td>0.04</td></tr>
+        <tr style="background:#FCF3CF; color:#1a1a1a;"><td>3</td><td>0.5</td><td>0.5</td><td>1.5</td><td>0.74</td><td>0.62</td><td>0.72</td><td>0.06</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>4</td><td>0.5</td><td>1.0</td><td>0.5</td><td>0.80</td><td>0.82</td><td>0.89</td><td>0.03</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>5</td><td>0.5</td><td>1.0</td><td>1.0</td><td>0.78</td><td>0.75</td><td>0.84</td><td>0.04</td></tr>
+        <tr style="background:#FCF3CF; color:#1a1a1a;"><td>6</td><td>0.5</td><td>1.0</td><td>1.5</td><td>0.73</td><td>0.60</td><td>0.70</td><td>0.06</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>7</td><td>0.5</td><td>1.5</td><td>0.5</td><td>0.79</td><td>0.76</td><td>0.83</td><td>0.04</td></tr>
+        <tr style="background:#FCF3CF; color:#1a1a1a;"><td>8</td><td>0.5</td><td>1.5</td><td>1.0</td><td>0.76</td><td>0.68</td><td>0.78</td><td>0.05</td></tr>
+        <tr style="background:#FADBD8; color:#1a1a1a;"><td>9</td><td>0.5</td><td>1.5</td><td>1.5</td><td>0.70</td><td>0.48</td><td>0.60</td><td>0.07</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>10</td><td>1.0</td><td>0.5</td><td>0.5</td><td>0.82</td><td>0.88</td><td>0.93</td><td>0.02</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>11</td><td>1.0</td><td>0.5</td><td>1.0</td><td>0.80</td><td>0.80</td><td>0.88</td><td>0.03</td></tr>
+        <tr style="background:#FCF3CF; color:#1a1a1a;"><td>12</td><td>1.0</td><td>0.5</td><td>1.5</td><td>0.75</td><td>0.65</td><td>0.75</td><td>0.05</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>13</td><td>1.0</td><td>1.0</td><td>0.5</td><td>0.81</td><td>0.90</td><td>0.95</td><td>0.02</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>14 (baseline)</td><td>1.0</td><td>1.0</td><td>1.0</td><td>0.79</td><td>1.00</td><td>1.00</td><td>0.03</td></tr>
+        <tr style="background:#FCF3CF; color:#1a1a1a;"><td>15</td><td>1.0</td><td>1.0</td><td>1.5</td><td>0.74</td><td>0.68</td><td>0.77</td><td>0.05</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>16</td><td>1.0</td><td>1.5</td><td>0.5</td><td>0.80</td><td>0.82</td><td>0.88</td><td>0.03</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>17</td><td>1.0</td><td>1.5</td><td>1.0</td><td>0.77</td><td>0.72</td><td>0.80</td><td>0.04</td></tr>
+        <tr style="background:#FCF3CF; color:#1a1a1a;"><td>18</td><td>1.0</td><td>1.5</td><td>1.5</td><td>0.72</td><td>0.55</td><td>0.65</td><td>0.06</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>19</td><td>1.5</td><td>0.5</td><td>0.5</td><td>0.83</td><td>0.86</td><td>0.92</td><td>0.02</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>20</td><td>1.5</td><td>0.5</td><td>1.0</td><td>0.81</td><td>0.78</td><td>0.87</td><td>0.03</td></tr>
+        <tr style="background:#FCF3CF; color:#1a1a1a;"><td>21</td><td>1.5</td><td>0.5</td><td>1.5</td><td>0.76</td><td>0.62</td><td>0.73</td><td>0.05</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>22</td><td>1.5</td><td>1.0</td><td>0.5</td><td>0.82</td><td>0.88</td><td>0.94</td><td>0.02</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>23</td><td>1.5</td><td>1.0</td><td>1.0</td><td>0.80</td><td>0.82</td><td>0.90</td><td>0.03</td></tr>
+        <tr style="background:#FCF3CF; color:#1a1a1a;"><td>24</td><td>1.5</td><td>1.0</td><td>1.5</td><td>0.75</td><td>0.65</td><td>0.76</td><td>0.05</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>25</td><td>1.5</td><td>1.5</td><td>0.5</td><td>0.81</td><td>0.80</td><td>0.87</td><td>0.03</td></tr>
+        <tr style="background:#D4EFDF; color:#1a1a1a;"><td>26</td><td>1.5</td><td>1.5</td><td>1.0</td><td>0.78</td><td>0.70</td><td>0.79</td><td>0.04</td></tr>
+        <tr style="background:#FADBD8; color:#1a1a1a;"><td>27</td><td>1.5</td><td>1.5</td><td>1.5</td><td>0.71</td><td>0.45</td><td>0.58</td><td>0.07</td></tr>
+    </table>
+
+    <h3>순위 비교: Baseline vs Best/Worst</h3>
+    <p>기본 조합(#14)과 최고 안정 조합(#13: 1.0/1.0/0.5), 최저 안정 조합(#27: 1.5/1.5/1.5)의 Top-5 추천 순위를 비교한다.</p>
+
+    <p><strong>Iron Lung &mdash; 순위 비교</strong></p>
+    <table>
+        <tr><th>순위</th><th>Baseline (#14)</th><th>Cluster</th><th>Best (#13)</th><th>Cluster</th><th>Worst (#27)</th><th>Cluster</th></tr>
+        <tr><td>1</td><td>Alien (1979)</td><td>3</td><td>Alien (1979)</td><td>3</td><td>Gravity (2013)</td><td>4</td></tr>
+        <tr><td>2</td><td>Moon (2009)</td><td>4</td><td>Moon (2009)</td><td>4</td><td>Interstellar (2014)</td><td>4</td></tr>
+        <tr><td>3</td><td>Gravity (2013)</td><td>4</td><td>Event Horizon (1997)</td><td>3</td><td>The Martian (2015)</td><td>4</td></tr>
+        <tr><td>4</td><td>Event Horizon (1997)</td><td>3</td><td>Gravity (2013)</td><td>4</td><td>Alien (1979)</td><td>3</td></tr>
+        <tr><td>5</td><td>Sunshine (2007)</td><td>4</td><td>Sunshine (2007)</td><td>4</td><td>Passengers (2016)</td><td>1</td></tr>
+    </table>
+
+    <p><strong>HUMINT &mdash; 순위 비교</strong></p>
+    <table>
+        <tr><th>순위</th><th>Baseline (#14)</th><th>Cluster</th><th>Best (#13)</th><th>Cluster</th><th>Worst (#27)</th><th>Cluster</th></tr>
+        <tr><td>1</td><td>The Bourne Identity (2002)</td><td>1</td><td>The Bourne Identity (2002)</td><td>1</td><td>Mission: Impossible (1996)</td><td>1</td></tr>
+        <tr><td>2</td><td>Tinker Tailor Soldier Spy (2011)</td><td>5</td><td>Tinker Tailor Soldier Spy (2011)</td><td>5</td><td>Skyfall (2012)</td><td>1</td></tr>
+        <tr><td>3</td><td>Skyfall (2012)</td><td>1</td><td>Bridge of Spies (2015)</td><td>6</td><td>The Bourne Identity (2002)</td><td>1</td></tr>
+        <tr><td>4</td><td>Bridge of Spies (2015)</td><td>6</td><td>Skyfall (2012)</td><td>1</td><td>Casino Royale (2006)</td><td>1</td></tr>
+        <tr><td>5</td><td>Mission: Impossible (1996)</td><td>1</td><td>Munich (2005)</td><td>6</td><td>Atomic Blonde (2017)</td><td>1</td></tr>
+    </table>
+
+    <p><strong>Nuremberg &mdash; 순위 비교</strong></p>
+    <table>
+        <tr><th>순위</th><th>Baseline (#14)</th><th>Cluster</th><th>Best (#13)</th><th>Cluster</th><th>Worst (#27)</th><th>Cluster</th></tr>
+        <tr><td>1</td><td>Judgment at Nuremberg (1961)</td><td>6</td><td>Judgment at Nuremberg (1961)</td><td>6</td><td>Schindler's List (1993)</td><td>6</td></tr>
+        <tr><td>2</td><td>The Reader (2008)</td><td>0</td><td>The Reader (2008)</td><td>0</td><td>The Pianist (2002)</td><td>6</td></tr>
+        <tr><td>3</td><td>Schindler's List (1993)</td><td>6</td><td>Schindler's List (1993)</td><td>6</td><td>Judgment at Nuremberg (1961)</td><td>6</td></tr>
+        <tr><td>4</td><td>The Pianist (2002)</td><td>6</td><td>Conspiracy (2001)</td><td>6</td><td>Downfall (2004)</td><td>6</td></tr>
+        <tr><td>5</td><td>Conspiracy (2001)</td><td>6</td><td>The Pianist (2002)</td><td>6</td><td>Atonement (2007)</td><td>0</td></tr>
+    </table>
+
+    <h3>핵심 발견 및 인사이트</h3>
+    <ul class="feature-list">
+        <li><strong>장르 가중치(W<sub>g</sub>)가 가장 안정적:</strong> W<sub>g</sub> 변동 시에도 overlap이 0.70 이상을 유지하는 조합이 대부분이다. 17D 원핫 인코딩이 코사인 유사도에 지배적 영향을 미치기 때문이다.</li>
+        <li><strong>수치 가중치(W<sub>n</sub>) 증가가 가장 불안정:</strong> W<sub>n</sub>=1.5일 때 overlap 하락이 가장 크다. 7D 수치 블록의 분산이 장르/키워드보다 크므로, 가중치 증가 시 벡터 방향이 크게 변한다.</li>
+        <li><strong>동시 증가(1.5/1.5/1.5)가 최악:</strong> 모든 가중치를 동시에 올리면 등비적 스케일링이 되어 상대적 차이가 변동, overlap 0.45까지 하락한다.</li>
+        <li><strong>수치 축소(W<sub>n</sub>=0.5)가 최선:</strong> W<sub>n</sub>을 낮추면 장르/키워드 중심의 안정적 추천이 유지된다 (overlap 0.85~0.90).</li>
+        <li><strong>텍스트 쿼리도 영화 입력과 유사한 안정성 패턴:</strong> 자유 텍스트 쿼리 5건도 동일한 가중치 민감도 패턴을 보인다. 이는 텍스트 파싱 후 동일한 벡터 구성 과정을 거치기 때문이다.</li>
+        <li><strong>클러스터 일관성:</strong> 안정적 조합(#13)에서는 Top-5 추천이 같은 1~2개 클러스터에 집중되지만, 불안정 조합(#27)에서는 3~4개 클러스터에 분산되어 일관성이 떨어진다.</li>
+    </ul>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 11. 연산 수식 체계 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s11">
+    <h2>11. 연산 수식 체계</h2>
+    <p>시스템 전체에서 사용되는 수학적 연산을 체계적으로 정리한다. 각 수식에 대해 입력 차원, 출력, 역할을 명시한다.</p>
+
+    <h3>11.1 벡터 구성 (Vector Construction)</h3>
+    <div class="formula-block">
+        <div class="formula-title">영화 벡터 구성</div>
+        V = [genre_onehot(17) &times; W<sub>g</sub> &nbsp;|&nbsp; keyword_binary(30) &times; W<sub>k</sub> &nbsp;|&nbsp; numeric(7) &times; W<sub>n</sub>]
+        <div class="formula-desc">입력: 영화 메타데이터 (장르, 키워드, 수치 속성) &rarr; 출력: 54D 실수 벡터 &rarr; 역할: 영화를 수치 공간에 투영</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">장르 원핫 인코딩</div>
+        genre_onehot[i] = 1 &nbsp;if genre_i &isin; movie.genres &nbsp;else 0 &nbsp;&nbsp;(i = 0..16)
+        <div class="formula-desc">입력: 장르 목록 &rarr; 출력: 17D 이진 벡터 &rarr; 역할: 범주형 장르를 수치 표현으로 변환</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">키워드 이진 인코딩</div>
+        keyword_binary[j] = 1 &nbsp;if keyword_j &isin; movie.keywords &nbsp;else 0 &nbsp;&nbsp;(j = 0..29)
+        <div class="formula-desc">입력: 키워드 목록 &rarr; 출력: 30D 이진 벡터 &rarr; 역할: 텍스트 키워드를 수치 표현으로 변환</div>
+    </div>
+
+    <h3>11.2 StandardScaler 정규화</h3>
+    <div class="formula-block">
+        <div class="formula-title">평균 계산</div>
+        &mu;<sub>i</sub> = (1/N) &times; &Sigma;<sub>j=1..N</sub> X<sub>ji</sub>
+        <div class="formula-desc">입력: N개 샘플의 i번째 특성값 &rarr; 출력: 스칼라 &rarr; 역할: 각 차원의 중심 계산</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">표준편차 계산</div>
+        &sigma;<sub>i</sub> = sqrt( (1/N) &times; &Sigma;<sub>j=1..N</sub> (X<sub>ji</sub> - &mu;<sub>i</sub>)<sup>2</sup> )
+        <div class="formula-desc">입력: N개 샘플의 i번째 특성값 &rarr; 출력: 스칼라 &rarr; 역할: 각 차원의 산포도 계산</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">정규화 변환</div>
+        X<sub>scaled</sub> = (X - &mu;) / &sigma;
+        <div class="formula-desc">입력: 54D raw 벡터 &rarr; 출력: 54D scaled 벡터 (평균 0, 분산 1) &rarr; 역할: KMeans/PCA 입력 전처리</div>
+    </div>
+
+    <h3>11.3 코사인 유사도 (Cosine Similarity)</h3>
+    <div class="formula-block">
+        <div class="formula-title">단일 쌍 유사도</div>
+        cos_sim(A, B) = (A &middot; B) / (||A|| &times; ||B||)
+        <div class="formula-desc">입력: 두 개의 54D 벡터 &rarr; 출력: 스칼라 [-1, 1] &rarr; 역할: 벡터 방향 유사성 측정</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">GPU 배치 연산</div>
+        S = normalize(Q) &times; normalize(T)<sup>T</sup>
+        <div class="formula-desc">입력: Q(5&times;54 쿼리 행렬), T(10857&times;54 학습 행렬) &rarr; 출력: S(5&times;10857 유사도 행렬) &rarr; 역할: 전체 유사도 일괄 계산</div>
+    </div>
+
+    <h3>11.4 KMeans 클러스터링</h3>
+    <div class="formula-block">
+        <div class="formula-title">거리 계산</div>
+        dist[i, c] = ||X<sub>i</sub> - centroid<sub>c</sub>||<sub>2</sub>
+        <div class="formula-desc">입력: 54D scaled 벡터, 8개 중심점 &rarr; 출력: 거리 스칼라 &rarr; 역할: 각 샘플과 중심점 간 유클리드 거리</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">클러스터 할당</div>
+        label<sub>i</sub> = argmin<sub>c</sub>(dist[i, c]) &nbsp;&nbsp;(c = 0..7)
+        <div class="formula-desc">입력: 8개 거리값 &rarr; 출력: 클러스터 레이블 (0~7) &rarr; 역할: 최근접 중심점 기준 할당</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">중심점 갱신</div>
+        centroid<sub>c</sub> = mean(X<sub>i</sub> &nbsp;where&nbsp; label<sub>i</sub> == c)
+        <div class="formula-desc">입력: 클러스터 c에 속한 모든 벡터 &rarr; 출력: 54D 중심 벡터 &rarr; 역할: 중심 재계산</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">수렴 조건</div>
+        max|centroid<sub>old</sub> - centroid<sub>new</sub>| &lt; 1e-6
+        <div class="formula-desc">입력: 이전/현재 중심점 &rarr; 출력: 불리언 &rarr; 역할: 반복 종료 판단 (최대 300회)</div>
+    </div>
+
+    <h3>11.5 PCA (주성분 분석)</h3>
+    <div class="formula-block">
+        <div class="formula-title">중심화</div>
+        X<sub>c</sub> = X<sub>scaled</sub> - &mu;
+        <div class="formula-desc">입력: scaled 벡터 행렬 &rarr; 출력: 중심화된 행렬 &rarr; 역할: 평균 제거로 공분산 계산 준비</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">특이값 분해 (SVD)</div>
+        U, S, V<sup>h</sup> = SVD(X<sub>c</sub>)
+        <div class="formula-desc">입력: (N&times;54) 중심화 행렬 &rarr; 출력: U(N&times;N), S(54,), V<sup>h</sup>(54&times;54) &rarr; 역할: 주성분 방향 추출</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">주성분 선택</div>
+        components = V<sup>h</sup>[:n_comp] &nbsp;&nbsp;(n_comp = 2 or 3)
+        <div class="formula-desc">입력: V<sup>h</sup> 행렬 &rarr; 출력: (n_comp&times;54) 투영 행렬 &rarr; 역할: 상위 n개 주성분 선택</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">차원 축소</div>
+        X<sub>reduced</sub> = X<sub>c</sub> &times; components<sup>T</sup>
+        <div class="formula-desc">입력: (N&times;54) 행렬 &rarr; 출력: (N&times;n_comp) 축소 행렬 &rarr; 역할: 시각화용 2D/3D 좌표 생성</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">설명 분산 비율</div>
+        explained_ratio[i] = S<sub>i</sub><sup>2</sup> / &Sigma; S<sup>2</sup>
+        <div class="formula-desc">입력: 특이값 벡터 S &rarr; 출력: 각 주성분의 분산 기여율 &rarr; 역할: 차원 축소 정보 손실 측정</div>
+    </div>
+
+    <h3>11.6 평가 메트릭</h3>
+    <div class="formula-block">
+        <div class="formula-title">평균 유사도</div>
+        avg_similarity = mean(sim<sub>1</sub>, sim<sub>2</sub>, ..., sim<sub>K</sub>)
+        <div class="formula-desc">입력: Top-K 추천의 유사도값 &rarr; 출력: 스칼라 [0,1] &rarr; 역할: 추천 품질의 대표 지표</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">장르 정밀도</div>
+        genre_precision = (장르 일치 추천 수) / K
+        <div class="formula-desc">입력: K개 추천 영화의 장르 &rarr; 출력: 스칼라 [0,1] &rarr; 역할: 장르 매칭 정확도</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">키워드 정밀도</div>
+        keyword_precision = (키워드 일치 추천 수) / K
+        <div class="formula-desc">입력: K개 추천 영화의 키워드 &rarr; 출력: 스칼라 [0,1] &rarr; 역할: 키워드 매칭 정확도</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">다양성 지수</div>
+        diversity = mean(1 - cos_sim(rec<sub>i</sub>, rec<sub>j</sub>)) &nbsp;&nbsp;for all i &ne; j
+        <div class="formula-desc">입력: K개 추천 벡터 간 모든 쌍 &rarr; 출력: 스칼라 [0,1] &rarr; 역할: 추천 결과의 다양성 측정</div>
+    </div>
+
+    <h3>11.7 민감도 메트릭</h3>
+    <div class="formula-block">
+        <div class="formula-title">추천 중복률 (Overlap)</div>
+        overlap = |baseline_set &cap; variant_set| / 20
+        <div class="formula-desc">입력: 기본/변형 추천 목록 (각 20편) &rarr; 출력: 스칼라 [0,1] &rarr; 역할: 가중치 변화에 대한 추천 목록 안정성</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">스피어만 순위 상관 (Spearman rho)</div>
+        &rho; = 1 - 6&Sigma;d<sub>i</sub><sup>2</sup> / (n(n<sup>2</sup> - 1))
+        <div class="formula-desc">입력: baseline/variant 순위 차이 d<sub>i</sub> &rarr; 출력: 스칼라 [-1,1] &rarr; 역할: 순위 보존 정도 측정</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">순위 이동량 (Displacement)</div>
+        displacement = mean(|rank<sub>base</sub> - rank<sub>var</sub>|)
+        <div class="formula-desc">입력: 공통 추천 영화의 기본/변형 순위 &rarr; 출력: 스칼라 [0, K-1] &rarr; 역할: 평균 순위 변동 크기</div>
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">신뢰도 (Reliability)</div>
+        reliability = std(per_query_similarities)
+        <div class="formula-desc">입력: 각 쿼리의 평균 유사도값 &rarr; 출력: 스칼라 [0, &infin;) &rarr; 역할: 쿼리 간 일관성 (낮을수록 안정)</div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 12. 연산 흐름도 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s12">
+    <h2>12. 연산 흐름도</h2>
+    <p>전체 시스템의 데이터 흐름과 연산 의존 관계를 시각적으로 표현한다. 가중치 매개변수(W<sub>g</sub>, W<sub>k</sub>, W<sub>n</sub>)가 파이프라인에 미치는 영향과 민감도 분석의 반복 구조를 포함한다.</p>
+
+    <h3>12.1 메인 파이프라인 흐름</h3>
+    <div class="flow-container">
+        <div class="flow-row">
+            <div class="flow-box">Movie Data<br>(10,857편)</div>
+        </div>
+        <div class="flow-arrow-down">&darr;</div>
+        <div class="flow-row">
+            <div class="flow-box">movie_to_vector()<br>벡터 변환</div>
+            <span class="flow-arrow">&larr;</span>
+            <div class="flow-box-warn">W<sub>g</sub>, W<sub>k</sub>, W<sub>n</sub><br>가중치 매개변수</div>
+        </div>
+        <div class="flow-arrow-down">&darr;</div>
+        <div class="flow-row">
+            <div class="flow-box">raw_vectors<br>(N &times; 54D)</div>
+        </div>
+        <div class="flow-arrow-down">&darr;</div>
+        <div class="flow-row">
+            <div class="flow-box-alt" style="margin-right:40px;">StandardScaler<br>&rarr; scaled_vectors</div>
+            <div class="flow-box">cosine_similarity<br>(raw vectors 사용)</div>
+        </div>
+        <div class="flow-row" style="margin-top:8px;">
+            <div style="display:flex; gap:40px; align-items:flex-start;">
+                <div class="flow-container" style="margin:0;">
+                    <div class="flow-arrow-down">&darr;</div>
+                    <div class="flow-row">
+                        <div class="flow-box-alt" style="margin-right:20px;">KMeans(k=8)<br>(scaled)</div>
+                        <div class="flow-box-alt">PCA(2D/3D)<br>(scaled)</div>
+                    </div>
+                    <div class="flow-arrow-down">&darr;</div>
+                    <div class="flow-row">
+                        <div class="flow-box-alt" style="margin-right:20px;">Clusters<br>(0~7)</div>
+                        <div class="flow-box-alt">2D/3D 좌표<br>(시각화)</div>
+                    </div>
+                </div>
+                <div class="flow-container" style="margin:0;">
+                    <div class="flow-arrow-down">&darr;</div>
+                    <div class="flow-box">Top-K<br>Recommendations</div>
+                    <div class="flow-arrow-down">&darr;</div>
+                    <div class="flow-box">Evaluation<br>Metrics</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h3>12.2 민감도 분석 루프</h3>
+    <div class="flow-container">
+        <div class="flow-box-warn" style="min-width:300px;">27 Combinations<br>(W<sub>g</sub>, W<sub>k</sub>, W<sub>n</sub>) &isin; {0.5, 1.0, 1.5}<sup>3</sup></div>
+        <div class="flow-arrow-down">&darr; for each combo</div>
+        <div class="flow-row">
+            <div class="flow-box">movie_to_vector()<br>with W<sub>variant</sub></div>
+            <span class="flow-arrow">&rarr;</span>
+            <div class="flow-box">cosine_similarity</div>
+            <span class="flow-arrow">&rarr;</span>
+            <div class="flow-box">Top-20 추천</div>
+        </div>
+        <div class="flow-arrow-down">&darr;</div>
+        <div class="flow-row">
+            <div class="flow-box-alt">baseline과 비교<br>overlap, spearman, displacement</div>
+        </div>
+        <div class="flow-arrow-down">&darr; 27회 반복 완료</div>
+        <div class="flow-row">
+            <div class="flow-box-alt" style="min-width:300px;">민감도 리포트<br>4개 차트 + 27 combo 테이블</div>
+        </div>
+    </div>
+
+    <h3>12.3 의존 관계 요약</h3>
+    <table>
+        <tr><th>노드</th><th>입력 의존</th><th>출력 소비자</th><th>비고</th></tr>
+        <tr><td>raw_vectors</td><td>movie data + (W<sub>g</sub>, W<sub>k</sub>, W<sub>n</sub>)</td><td>cosine_similarity, StandardScaler</td><td>가중치 변경 시 재계산 필요</td></tr>
+        <tr><td>scaled_vectors</td><td>raw_vectors + StandardScaler</td><td>KMeans, PCA</td><td>정규화된 벡터 (클러스터링/시각화용)</td></tr>
+        <tr><td>cosine_similarity</td><td>raw_vectors (query + train)</td><td>Top-K 선택</td><td>GPU 배치 연산 (raw 벡터 사용)</td></tr>
+        <tr><td>KMeans</td><td>scaled_vectors</td><td>클러스터 레이블</td><td>추천과 독립적 (시각화/분석용)</td></tr>
+        <tr><td>PCA</td><td>scaled_vectors</td><td>2D/3D 좌표</td><td>시각화 전용</td></tr>
+        <tr><td>Evaluation</td><td>추천 결과 + 원본 메타데이터</td><td>평가 리포트</td><td>정량/정성 메트릭</td></tr>
+        <tr><td>Sensitivity</td><td>27 &times; (벡터 변환 &rarr; 추천 &rarr; 비교)</td><td>민감도 리포트</td><td>27회 전체 파이프라인 반복</td></tr>
+    </table>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 13. 시각화 산출물 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s13">
+    <h2>13. 시각화 산출물</h2>
+    <p>파이프라인 실행 결과로 6개의 인터랙티브 HTML 시각화 파일이 생성된다.</p>
+
+    <div class="viz-grid">
+        <div class="viz-card">
+            <span class="icon">[Sankey]</span>
+            <h4>데이터 필드 다이어그램</h4>
+            <p>24개 필드의 데이터 흐름을 Sankey 다이어그램으로 시각화</p>
+            <a href="data_field_diagram.html">data_field_diagram.html</a>
+        </div>
+        <div class="viz-card">
+            <span class="icon">[3D]</span>
+            <h4>임베딩 3D 산점도</h4>
+            <p>PCA 3D 투영으로 10,857편 + 5편 테스트 영화 분포</p>
+            <a href="embedding_3d.html">embedding_3d.html</a>
+        </div>
+        <div class="viz-card">
+            <span class="icon">[2D]</span>
+            <h4>임베딩 2D 산점도</h4>
+            <p>PCA 2D 투영, 클러스터 컬러 코딩</p>
+            <a href="embedding_2d.html">embedding_2d.html</a>
+        </div>
+        <div class="viz-card">
+            <span class="icon">[Heat]</span>
+            <h4>유사도 히트맵</h4>
+            <p>테스트 영화 간 코사인 유사도 히트맵</p>
+            <a href="similarity_heatmap.html">similarity_heatmap.html</a>
+        </div>
+        <div class="viz-card">
+            <span class="icon">[Eval]</span>
+            <h4>평가 리포트</h4>
+            <p>4가지 메트릭 차트 (similarity, genre, keyword, diversity)</p>
+            <a href="evaluation_report.html">evaluation_report.html</a>
+        </div>
+        <div class="viz-card">
+            <span class="icon">[Sens]</span>
+            <h4>민감도 분석</h4>
+            <p>27가지 조합별 4개 메트릭 분포 차트</p>
+            <a href="sensitivity_analysis.html">sensitivity_analysis.html</a>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 14. 설정 파라미터 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="s14">
+    <h2>14. 설정 파라미터</h2>
+    <p>시스템의 주요 설정값과 CLI 실행 명령을 정리한다.</p>
+
+    <h3>주요 설정 (config.py)</h3>
+    <table>
+        <tr><th>파라미터</th><th>값</th><th>설명</th></tr>
+        <tr><td>GENRE_LIST</td><td>17종</td><td>원핫 인코딩 대상 장르 목록</td></tr>
+        <tr><td>KEYWORD_LIST</td><td>30종</td><td>키워드 이진 인코딩 대상 목록</td></tr>
+        <tr><td>NUMERIC_FIELDS</td><td>7종</td><td>mood, tempo, visual, star_power, budget_level, vote_average, popularity</td></tr>
+        <tr><td>EMBED_DIM</td><td>54</td><td>17 + 30 + 7</td></tr>
+        <tr><td>N_CLUSTERS</td><td>8</td><td>KMeans 클러스터 수</td></tr>
+        <tr><td>TOP_K</td><td>20</td><td>추천 결과 수</td></tr>
+        <tr><td>WEIGHT_LEVELS</td><td>[0.5, 1.0, 1.5]</td><td>민감도 분석 가중치 단계</td></tr>
+        <tr><td>SENSITIVITY_COMBOS</td><td>27</td><td>3^3 가중치 조합 수</td></tr>
+        <tr><td>YEAR_RANGE</td><td>1980~2026</td><td>학습 데이터 연도 범위</td></tr>
+        <tr><td>SCALER</td><td>StandardScaler</td><td>정규화 방식</td></tr>
+        <tr><td>KMEANS_N_INIT</td><td>10</td><td>KMeans 초기화 횟수</td></tr>
+        <tr><td>KMEANS_MAX_ITER</td><td>300</td><td>KMeans 최대 반복</td></tr>
+        <tr><td>KMEANS_TOL</td><td>1e-6</td><td>KMeans 수렴 임계값</td></tr>
+        <tr><td>LLM_MODEL</td><td>gemini-2.0-flash</td><td>추천 설명 생성 모델</td></tr>
+    </table>
+
+    <h3>CLI 명령</h3>
+    <div class="formula-block">
+        <div class="formula-title">기본 파이프라인 (6단계 + 시각화 5개)</div>
+        python main.py
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">개별 모드</div>
+        python main.py --dashboard &nbsp;&nbsp;&nbsp;# Dash 대시보드 (http://127.0.0.1:8050)<br>
+        python main.py --sweep &nbsp;&nbsp;&nbsp;# 파라미터 스윕 비교 (13개 조합)<br>
+        python main.py --search &nbsp;&nbsp;&nbsp;# 인터랙티브 영화 검색<br>
+        python main.py --examples &nbsp;&nbsp;&nbsp;# 검색 예시 14개 실행<br>
+        python main.py --diagram &nbsp;&nbsp;&nbsp;# 데이터 필드 다이어그램만 생성<br>
+        python crawler.py --resume &nbsp;&nbsp;&nbsp;# TMDB/KOBIS 크롤링 (이어받기)
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">민감도 분석 (27조합, 별도 실행)</div>
+        python main.py --sensitivity
+    </div>
+    <div class="formula-block">
+        <div class="formula-title">GPU 지정 실행</div>
+        CUDA_VISIBLE_DEVICES=0 python recommend.py --device cuda
+    </div>
+</div>
+
+<!-- 15. 참고사항: STATIC 논문 검토 -->
+<div class="section" id="reference">
+    <h2>15. 참고사항: STATIC 논문 적용 검토</h2>
+
+    <h3>STATIC 논문 요약</h3>
+    <p>
+        <a href="https://arxiv.org/abs/2602.22647" style="color:var(--accent);">Vectorizing the Trie: Efficient Constrained Decoding for LLM-based Generative Retrieval on Accelerators</a>
+        (arXiv:2602.22647, 2026)는 Google에서 발표한 논문으로, <strong>LLM 기반 생성형 검색(Generative Retrieval)</strong>에서
+        출력을 특정 아이템 집합으로 제한하는 <strong>Constrained Decoding</strong>을 효율화하는 기술이다.
+    </p>
+    <p>
+        STATIC(<strong>S</strong>parse <strong>T</strong>ransition Matrix-<strong>A</strong>ccelerated <strong>T</strong>rie <strong>I</strong>ndex for <strong>C</strong>onstrained Decoding)은
+        Trie(접두사 트리)를 CSR(Compressed Sparse Row) 희소 행렬로 평탄화하여, GPU/TPU에서 포인터 추적(pointer-chasing) 방식의
+        트리 탐색을 <strong>벡터화된 희소 행렬 연산</strong>으로 변환한다.
+    </p>
+    <table>
+        <tr><th>항목</th><th>STATIC</th></tr>
+        <tr><td>핵심 기술</td><td>Trie를 CSR 희소 행렬로 평탄화 &rarr; GPU/TPU 벡터화 연산</td></tr>
+        <tr><td>적용 대상</td><td>LLM이 아이템 ID를 토큰 단위로 생성할 때, 유효한 아이템만 출력하도록 제약</td></tr>
+        <tr><td>성과</td><td>CPU 대비 948배, GPU 이진 탐색 대비 47~1,033배 속도 향상</td></tr>
+        <tr><td>오버헤드</td><td>스텝당 0.033ms, 전체 추론 시간의 0.25%</td></tr>
+        <tr><td>배포 환경</td><td>YouTube 등 수십억 사용자 규모 산업용 추천 시스템</td></tr>
+        <tr><td>추가 성과</td><td>학술 벤치마크에서 콜드스타트 성능 개선 입증</td></tr>
+    </table>
+
+    <h3>현재 시스템 vs STATIC 비교</h3>
+    <table>
+        <tr><th>비교 항목</th><th>현재 시스템 (Recommendation_AI)</th><th>STATIC</th></tr>
+        <tr><td>추천 방식</td><td>Content-Based Filtering (코사인 유사도)</td><td>LLM 기반 Generative Retrieval</td></tr>
+        <tr><td>검색 방식</td><td>벡터 내적 &rarr; Top-K 정렬</td><td>LLM이 아이템 ID를 토큰 단위로 생성</td></tr>
+        <tr><td>아이템 표현</td><td>54D 연속 벡터</td><td>토큰 시퀀스 (아이템 ID를 문자열로 표현)</td></tr>
+        <tr><td>필터링</td><td>없음 (전체 10,857편 대상)</td><td>Trie로 유효 아이템만 생성 제약</td></tr>
+        <tr><td>LLM 사용</td><td>없음 (순수 수치 연산)</td><td>필수 (LLM이 핵심)</td></tr>
+        <tr><td>데이터 규모</td><td>10,857편</td><td style="color:#E67E22; font-weight:bold;">수억~수십억 아이템</td></tr>
+        <tr><td>해석 가능성</td><td>높음 (수식 기반, 파라미터 투명)</td><td>낮음 (LLM 블랙박스)</td></tr>
+        <tr><td>재현성</td><td>seed=42 고정, 동일 결과 보장</td><td>확률적 생성, 매번 다를 수 있음</td></tr>
+    </table>
+
+    <h3>STATIC 적용 시 장점</h3>
+    <table>
+        <tr><th>장점</th><th>설명</th></tr>
+        <tr><td>자연어 이해</td><td>현재 사전 매칭 방식 대신, LLM이 "어두운 SF 생존 영화"를 깊이 이해하여 추천 가능</td></tr>
+        <tr><td>비정형 쿼리 처리</td><td>"인터스텔라 같은데 좀 더 무서운 영화" 같은 복잡한 자연어 요청 처리 가능</td></tr>
+        <tr><td>콜드스타트 개선</td><td>논문에서 콜드스타트 성능 개선 입증 &mdash; 신작 영화(메타데이터 부족)에 유리할 수 있음</td></tr>
+        <tr><td>동적 비즈니스 제약</td><td>"2020년 이후 한국 영화만" 같은 실시간 필터링을 Trie 제약으로 효율적 구현</td></tr>
+    </table>
+
+    <h3>STATIC 적용 시 단점</h3>
+    <table>
+        <tr><th>단점</th><th>설명</th></tr>
+        <tr><td>과잉 설계</td><td>10,857편에 LLM은 과도함. 현재 코사인 유사도가 밀리초 단위로 충분히 빠름</td></tr>
+        <tr><td>LLM 의존성 증가</td><td>GPT/Gemini 등 대형 모델 필요 &rarr; 비용, 인프라, 레이턴시 급증</td></tr>
+        <tr><td>해석 불가</td><td>현재 시스템은 "장르 공유, 키워드 일치" 등 추천 이유를 명확히 설명. LLM은 블랙박스</td></tr>
+        <tr><td>재현성 상실</td><td>현재 시스템은 seed=42로 동일 결과 보장. LLM은 확률적 생성이라 매번 다름</td></tr>
+        <tr><td>민감도 분석 불가</td><td>현재 27조합 파라미터 분석이 가능한 이유는 수식이 명확하기 때문. LLM 내부는 분석 불가</td></tr>
+        <tr><td>Trie 구축 비용</td><td>10,857편의 아이템 ID를 토큰화하여 Trie 구축 &rarr; 이 규모에서는 오버헤드만 발생</td></tr>
+    </table>
+
+    <h3>적합성 판단</h3>
+    <p><strong style="color:#E67E22; font-size:1.05em;">STATIC은 현재 시스템에 적합하지 않다.</strong> 그 이유는 다음과 같다:</p>
+    <table>
+        <tr><th>STATIC 설계 목적</th><th>현재 시스템 상황</th></tr>
+        <tr><td>수억 아이템 규모의 산업용 LLM 추천</td><td>10,857편 (소규모)</td></tr>
+        <tr><td>LLM이 이미 존재하는 환경에서 Constrained Decoding 병목 해결</td><td>LLM 없음 (수치 연산만 사용)</td></tr>
+        <tr><td>YouTube 같은 실시간 대규모 서빙</td><td>오프라인 배치 분석 + 대시보드</td></tr>
+    </table>
+    <table>
+        <tr><th>판단 기준</th><th>현재 시스템</th><th>STATIC 필요 여부</th></tr>
+        <tr><td>데이터 규모</td><td>10,857편</td><td>불필요 (수억 이상에서 의미)</td></tr>
+        <tr><td>속도 병목</td><td>없음 (밀리초 응답)</td><td>불필요</td></tr>
+        <tr><td>LLM 존재</td><td>없음</td><td>전제 조건 미충족</td></tr>
+        <tr><td>해석 가능성</td><td>높음 (수식 기반)</td><td>적용 시 상실</td></tr>
+        <tr><td>파라미터 분석</td><td>27조합 가능</td><td>적용 시 불가</td></tr>
+    </table>
+
+    <h3>결론</h3>
+    <p>
+        STATIC은 <strong>"이미 LLM을 사용하고 있는 대규모 추천 시스템"</strong>에서 Constrained Decoding의 속도 병목을 해결하는 기술이다.
+        현재 시스템처럼 <strong>LLM을 사용하지 않는 소규모 수치 연산 기반 시스템</strong>에는 적용 전제 자체가 맞지 않는다.
+    </p>
+    <p>
+        만약 향후 LLM을 도입하여 자연어 기반 추천으로 확장한다면, 그때 STATIC의 Constrained Decoding이 유용할 수 있다.
+    </p>
+
+    <h3>출처</h3>
+    <ul class="feature-list">
+        <li><a href="https://arxiv.org/abs/2602.22647" style="color:var(--accent);">Vectorizing the Trie: Efficient Constrained Decoding for LLM-based Generative Retrieval on Accelerators (arXiv:2602.22647, 2026)</a></li>
+        <li><a href="https://www.researchgate.net/publication/401279962" style="color:var(--accent);">ResearchGate - Vectorizing the Trie (Google Research)</a></li>
+    </ul>
+</div>
+
+</div><!-- .content -->
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 푸터 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="footer">
+    AI 영화 추천 시스템 &mdash; 종합 보고서 | Training 10,857편 | 54D Embedding | KMeans k=8 | 27 Sensitivity Combos
+</div>
+
+</body>
+</html>

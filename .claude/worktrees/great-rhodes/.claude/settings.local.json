@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/yssong/Recommendation_AI/.claude/worktrees/great-rhodes -type f \\\\\\(-name *.csv -o -name *.json -o -name *.parquet -o -name *.jsonl \\\\\\))",
+      "Read(//c/yssong/Recommendation_AI/**)",
+      "Bash(find . -type d -not -path */.*)",
+      "Bash(wc -l /c/yssong/Recommendation_AI/data/*.json)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''sensitivity.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''sensitivity.py OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''visualizer.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''visualizer.py OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''main.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''main.py OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''dashboard.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''dashboard.py OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''config.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''config.py OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''visualizer.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''main.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''clustering.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''OK''\\)\")",
+      "Bash(python3 -c \"import json; data = json.load\\(open\\(''data/movies.json''\\)\\); print\\(f''Total movies: {len\\(data\\)}''\\)\")",
+      "Bash(ls /c/yssong/Recommendation_AI/results/*.html)",
+      "Bash(python crawler.py --resume)",
+      "Bash(python -c \":*)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''sensitivity.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''sensitivity OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''visualizer.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''visualizer OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''config.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''config OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''dashboard.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''dashboard OK''\\)\")",
+      "Bash(ls -la /c/yssong/Recommendation_AI/README.md /c/yssong/Recommendation_AI/.claude/worktrees/*/README.md)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''clustering.py''\\).read\\(\\)\\)\")",
+      "Bash(python3 -m pip list)",
+      "Bash(python3 -c \":*)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\(''$f'', encoding=''utf-8'', errors=''replace''\\).read\\(\\)\\)\")",
+      "Bash(done)",
+      "Bash(file *.py)",
+      "Bash(python3:*)",
+      "Bash(grep '^```' /c/yssong/Recommendation_AI/README.md)",
+      "Bash(grep '^```' /c/yssong/Recommendation_AI/CLAUDE.md)",
+      "Bash(wc -l *.py)",
+      "Bash(grep -n \"import torch\" *.py)",
+      "Bash(ls *.py)",
+      "WebSearch",
+      "WebFetch(domain:arxiv.org)"
+    ]
+  }
+}
