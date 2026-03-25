@@ -1,150 +1,390 @@
 """
-data_loader.py -- Stage 1: 데이터 로드 및 검증
+data_loader.py -- KMDB 데이터 로드 및 전처리
 ====================================================================
-크롤링된 JSON 데이터를 로드하고, 임베딩에 필요한 필수 필드를 검증한다.
-누락된 수치 특징은 중립값(0.5)으로 대체한다.
+Data_new/movies/ 하위 554개 JSON 파일을 순회하여 영화 레코드를 정규화하고,
+극영화/애니메이션/다큐멘터리만 필터링한다.
+장르 매핑, 키워드 정리, 파생 수치 계산 후 캐시에 저장한다.
 """
 
 import json
-from pathlib import Path
+import glob
+import os
+import pickle
+import re
+from collections import Counter
+from tqdm import tqdm
 
 import config
 
 
-# ═══════════════════════════════════════════════════════════════════
-# 데이터 로드
-# ═══════════════════════════════════════════════════════════════════
+def _safe_int(value, default=None):
+    """문자열을 int로 안전하게 변환한다."""
+    if value is None:
+        return default
+    try:
+        v = int(str(value).strip())
+        return v if v > 0 else default
+    except (ValueError, TypeError):
+        return default
 
-# 임베딩에 필요한 필수 필드
-_REQUIRED_FIELDS = [
-    "title", "year", "genres", "mood", "tempo",
-    "visual_style", "star_power", "keywords",
-    "budget_scale", "origin"
-]
+
+def _extract_plot(plots_data):
+    """plots 딕셔너리에서 한국어/영어 줄거리를 추출한다."""
+    plot_ko = ""
+    plot_en = ""
+    if not isinstance(plots_data, dict):
+        return plot_ko, plot_en
+    plot_list = plots_data.get("plot", [])
+    if not isinstance(plot_list, list):
+        return plot_ko, plot_en
+    for p in plot_list:
+        if not isinstance(p, dict):
+            continue
+        text = p.get("plotText", "").strip()
+        lang = p.get("plotLang", "")
+        if lang == "한국어" and text and not plot_ko:
+            plot_ko = text
+        elif lang == "영어" and text and not plot_en:
+            plot_en = text
+    return plot_ko, plot_en
 
 
-def load_movies(json_path: str = None) -> list[dict]:
-    """
-    크롤링된 영화 데이터를 JSON 파일에서 로드.
+def _extract_directors(directors_data):
+    """directors 딕셔너리에서 감독 이름 목록을 추출한다."""
+    names = []
+    if not isinstance(directors_data, dict):
+        return names
+    director_list = directors_data.get("director", [])
+    if not isinstance(director_list, list):
+        return names
+    for d in director_list:
+        if isinstance(d, dict):
+            nm = d.get("directorNm", "").strip()
+            if nm:
+                names.append(nm)
+    return names
 
-    Args:
-        json_path: JSON 파일 경로 (None이면 config.DATA_PATH 사용)
 
-    Returns:
-        유효한 영화 dict 리스트
-    """
-    path = Path(json_path or config.DATA_PATH)
-    if not path.exists():
-        print(f"[오류] {path} 파일이 존재하지 않습니다.")
+def _extract_actors(actors_data, max_count=10):
+    """actors 딕셔너리에서 배우 이름 목록을 추출한다."""
+    names = []
+    if not isinstance(actors_data, dict):
+        return names
+    actor_list = actors_data.get("actor", [])
+    if not isinstance(actor_list, list):
+        return names
+    for a in actor_list:
+        if isinstance(a, dict):
+            nm = a.get("actorNm", "").strip()
+            if nm:
+                names.append(nm)
+            if len(names) >= max_count:
+                break
+    return names
+
+
+def _normalize_genres(raw_genre_str):
+    """원본 장르 문자열을 표준 장르 목록으로 변환한다."""
+    if not raw_genre_str:
         return []
-
-    with open(path, encoding="utf-8") as f:
-        movies = json.load(f)
-
-    valid = []
-    for m in movies:
-        if all(m.get(k) is not None for k in _REQUIRED_FIELDS):
-            # 누락 가능한 수치 필드 기본값 처리
-            if m.get("critic_score") is None:
-                m["critic_score"] = 0.5
-            if m.get("audience_score") is None:
-                m["audience_score"] = 0.5
-            # runtime=0은 결측치 (실제 상영시간 0분은 불가능)
-            if m.get("runtime") is None or m["runtime"] == 0:
-                m["runtime"] = None
-            valid.append(m)
-
-    print(f"[Stage 1] 데이터 로드 완료: {len(valid)}편 (전체 {len(movies)}편 중 유효)")
-    return valid
+    parts = re.split(r"[/,]", raw_genre_str)
+    mapped = set()
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        std = config.GENRE_MAP.get(part)
+        if std:
+            mapped.add(std)
+    return sorted(mapped)
 
 
-def load_test_movies() -> list[dict]:
-    """테스트 영화(2026년 개봉 예정작) 반환"""
-    test = []
-    for m in config.TEST_MOVIES:
-        movie = dict(m)
-        if movie.get("critic_score") is None:
-            movie["critic_score"] = 0.5
-        if movie.get("audience_score") is None:
-            movie["audience_score"] = 0.5
-        test.append(movie)
-    return test
+def _normalize_keywords(raw_keyword_str):
+    """원본 키워드 문자열을 정리된 키워드 목록으로 변환한다."""
+    if not raw_keyword_str:
+        return []
+    parts = re.split(r"[|,]", raw_keyword_str)
+    keywords = []
+    for part in parts:
+        part = part.strip()
+        if part and len(part) > 1:
+            keywords.append(part)
+    return keywords
 
 
-# ═══════════════════════════════════════════════════════════════════
-# 데이터 필드 정보 (다이어그램용)
-# ═══════════════════════════════════════════════════════════════════
+def _find_poster_path(data_dir, year_str, month_str, movie_id, movie_seq, title):
+    """로컬 포스터 이미지 경로를 찾는다."""
+    image_dir = os.path.join(data_dir, year_str, month_str, "image")
+    if not os.path.isdir(image_dir):
+        return None, False
 
-def get_data_field_info() -> dict:
+    prefix = f"{movie_id}_{movie_seq}_"
+    try:
+        for fname in os.listdir(image_dir):
+            if fname.startswith(prefix) and fname.lower().endswith(".jpg"):
+                full_path = os.path.join(image_dir, fname)
+                has_image = "_noimage" not in fname.lower()
+                return full_path, has_image
+    except OSError:
+        pass
+    return None, False
+
+
+def _compute_numeric_features(movie_dict):
+    """파생 수치 피처를 계산한다 (0~1 범위)."""
+    rt = movie_dict.get("runtime")
+    if rt and rt > 0:
+        movie_dict["runtime_norm"] = max(0.0, min(1.0, (rt - 30) / (240 - 30)))
+    else:
+        movie_dict["runtime_norm"] = 0.5
+
+    year = movie_dict.get("year", 2000)
+    movie_dict["year_norm"] = max(0.0, min(1.0, (year - 1980) / (2026 - 1980)))
+
+    kw_count = len(movie_dict.get("keywords_matched", []))
+    movie_dict["keyword_richness"] = min(kw_count / 10.0, 1.0)
+
+    cast_count = len(movie_dict.get("actors", []))
+    movie_dict["cast_size_norm"] = min(cast_count / 20.0, 1.0)
+
+    genre_count = len(movie_dict.get("genres", []))
+    movie_dict["genre_count_norm"] = min(genre_count / 5.0, 1.0)
+
+    return movie_dict
+
+
+def load_movies(data_dir=None, use_cache=True, show_progress=True):
     """
-    크롤링 데이터의 24개 필드와 임베딩 사용 여부 매핑 반환.
-    visualizer.py의 데이터 필드 다이어그램에서 사용.
+    KMDB 데이터를 로드하고 전처리한다.
 
-    Returns:
-        {field_name: {"category": str, "embedding_dim": int, "description": str}}
+    Parameters
+    ----------
+    data_dir : str, optional
+        데이터 디렉토리 경로 (기본: config.DATA_DIR)
+    use_cache : bool
+        캐시 파일이 있으면 사용할지 여부
+    show_progress : bool
+        진행 바 표시 여부
+
+    Returns
+    -------
+    list[dict]
+        전처리된 영화 딕셔너리 목록
     """
+    if data_dir is None:
+        data_dir = config.DATA_DIR
+
+    if use_cache and os.path.exists(config.CACHE_PATH):
+        print(f"[data_loader] 캐시 로드: {config.CACHE_PATH}")
+        with open(config.CACHE_PATH, "rb") as f:
+            movies = pickle.load(f)
+        print(f"[data_loader] {len(movies):,}편 로드 완료")
+        return movies
+
+    json_pattern = os.path.join(data_dir, "**", "json", "*.json")
+    json_files = sorted(glob.glob(json_pattern, recursive=True))
+    print(f"[data_loader] JSON 파일 {len(json_files)}개 발견")
+
+    if not json_files:
+        raise FileNotFoundError(f"JSON 파일을 찾을 수 없습니다: {json_pattern}")
+
+    keyword_set = set(config.ALL_KEYWORDS)
+
+    movies = []
+    skipped_type = 0
+    skipped_no_title = 0
+
+    iterator = tqdm(json_files, desc="데이터 로드") if show_progress else json_files
+
+    for jf in iterator:
+        parts = jf.replace("\\", "/").split("/")
+        month_str = None
+        year_str = None
+        for p in parts:
+            if re.match(r"\d{4}_\d{2}$", p):
+                month_str = p
+                year_str = p.split("_")[0]
+                break
+
+        with open(jf, encoding="utf-8") as f:
+            try:
+                raw_movies = json.load(f)
+            except json.JSONDecodeError:
+                continue
+
+        if not isinstance(raw_movies, list):
+            continue
+
+        for m in raw_movies:
+            if not isinstance(m, dict):
+                continue
+
+            movie_type = m.get("type", "").strip()
+            if movie_type not in config.ALLOWED_TYPES:
+                skipped_type += 1
+                continue
+
+            title = m.get("title", "").strip()
+            if not title:
+                skipped_no_title += 1
+                continue
+
+            movie_id = m.get("movieId", "").strip()
+            movie_seq = m.get("movieSeq", "").strip()
+            doc_id = m.get("DOCID", f"{movie_id}{movie_seq}")
+
+            prod_year = _safe_int(m.get("prodYear"), default=2000)
+            genres = _normalize_genres(m.get("genre", ""))
+            raw_keywords = _normalize_keywords(m.get("keywords", ""))
+            keywords_matched = [k for k in raw_keywords if k in keyword_set]
+
+            plot_ko, plot_en = _extract_plot(m.get("plots"))
+            directors = _extract_directors(m.get("directors"))
+            actors = _extract_actors(m.get("actors"))
+            runtime = _safe_int(m.get("runtime"))
+            audi_acc = _safe_int(m.get("audiAcc"))
+            nation = m.get("nation", "").strip()
+            rating = m.get("rating", "").strip()
+
+            poster_path = None
+            has_poster = False
+            if month_str and year_str:
+                poster_path, has_poster = _find_poster_path(
+                    data_dir, year_str, month_str,
+                    movie_id, movie_seq, title
+                )
+
+            title_eng = m.get("titleEng", "").strip()
+            awards = " ".join(filter(None, [
+                m.get("Awards1", "").strip(),
+                m.get("Awards2", "").strip(),
+            ]))
+            release_date = m.get("repRlsDate", "").strip()
+
+            movie_dict = {
+                "id": doc_id,
+                "title": title,
+                "title_eng": title_eng,
+                "year": prod_year,
+                "release_date": release_date,
+                "genres": genres,
+                "genre_raw": m.get("genre", ""),
+                "keywords_all": raw_keywords,
+                "keywords_matched": keywords_matched,
+                "runtime": runtime,
+                "rating": rating,
+                "type": movie_type,
+                "nation": nation,
+                "directors": directors,
+                "actors": actors,
+                "plot_ko": plot_ko,
+                "plot_en": plot_en,
+                "poster_path": poster_path,
+                "has_poster": has_poster,
+                "audience_count": audi_acc,
+                "awards": awards,
+            }
+
+            movie_dict = _compute_numeric_features(movie_dict)
+            movies.append(movie_dict)
+
+    print(f"[data_loader] 로드 완료: {len(movies):,}편")
+    print(f"[data_loader] 제외: 타입 필터 {skipped_type:,}, 제목 없음 {skipped_no_title:,}")
+
+    os.makedirs(os.path.dirname(config.CACHE_PATH), exist_ok=True)
+    with open(config.CACHE_PATH, "wb") as f:
+        pickle.dump(movies, f, protocol=pickle.HIGHEST_PROTOCOL)
+    print(f"[data_loader] 캐시 저장: {config.CACHE_PATH}")
+
+    return movies
+
+
+def select_test_movies(movies, count=None, titles=None):
+    """
+    테스트 영화를 선정한다.
+
+    Parameters
+    ----------
+    movies : list[dict]
+    count : int, optional
+    titles : list[str], optional
+
+    Returns
+    -------
+    train_movies, test_movies
+    """
+    if count is None:
+        count = config.TEST_MOVIE_COUNT
+
+    if titles:
+        title_set = set(titles)
+        test = [m for m in movies if m["title"] in title_set]
+        train = [m for m in movies if m["title"] not in title_set]
+        return train, test
+
+    candidates = [
+        m for m in movies
+        if m["year"] >= 2025 and m["plot_ko"] and len(m["genres"]) > 0
+    ]
+    candidates.sort(key=lambda x: x.get("release_date", ""), reverse=True)
+
+    test = candidates[:count]
+    test_ids = {m["id"] for m in test}
+    train = [m for m in movies if m["id"] not in test_ids]
+
+    return train, test
+
+
+def get_data_field_info():
+    """데이터 필드 정보를 반환한다 (시각화용)."""
     fields = {
-        # --- 임베딩에 사용되는 필드 ---
-        "genres": {
+        "genre": {
             "category": "embedding",
             "encoding": "one-hot",
-            "embedding_dim": len(config.ALL_GENRES),
-            "description": f"장르 원-핫 인코딩 ({len(config.ALL_GENRES)}D)",
+            "embedding_dim": config.GENRE_DIM,
+            "description": f"장르 원-핫 인코딩 ({config.GENRE_DIM}D)",
         },
         "keywords": {
             "category": "embedding",
             "encoding": "binary",
-            "embedding_dim": len(config.ALL_KEYWORDS),
-            "description": f"키워드 바이너리 인코딩 ({len(config.ALL_KEYWORDS)}D)",
+            "embedding_dim": config.KEYWORD_DIM,
+            "description": f"키워드 바이너리 인코딩 ({config.KEYWORD_DIM}D)",
         },
-        "mood": {
+        "runtime": {
             "category": "embedding",
             "encoding": "numeric",
             "embedding_dim": 1,
-            "description": "분위기 (0.0=밝음 ~ 1.0=어두움)",
+            "description": "런타임 정규화 (1D)",
         },
-        "tempo": {
+        "prodYear": {
             "category": "embedding",
             "encoding": "numeric",
             "embedding_dim": 1,
-            "description": "전개 속도 (0.0=느림 ~ 1.0=빠름)",
+            "description": "연도 정규화 (1D)",
         },
-        "visual_style": {
+        "actors_count": {
             "category": "embedding",
             "encoding": "numeric",
             "embedding_dim": 1,
-            "description": "시각 스타일 (0.0=사실적 ~ 1.0=환상적)",
+            "description": "출연진 규모 정규화 (1D)",
         },
-        "star_power": {
+        "keywords_count": {
             "category": "embedding",
             "encoding": "numeric",
             "embedding_dim": 1,
-            "description": "출연진 인지도 (0.0~1.0)",
+            "description": "키워드 풍부도 (1D)",
         },
-        "critic_score": {
+        "genre_count": {
             "category": "embedding",
             "encoding": "numeric",
             "embedding_dim": 1,
-            "description": "평론가 점수 (0.0~1.0, None->0.5)",
+            "description": "장르 수 정규화 (1D)",
         },
-        "audience_score": {
+        "plots": {
             "category": "embedding",
-            "encoding": "numeric",
-            "embedding_dim": 1,
-            "description": "관객 점수 (0.0~1.0, None->0.5)",
-        },
-        "budget_scale": {
-            "category": "embedding",
-            "encoding": "numeric",
-            "embedding_dim": 1,
-            "description": "제작 규모 (0.0=저예산 ~ 1.0=블록버스터)",
-        },
-        # --- 메타데이터 (평가에만 사용) ---
-        "origin": {
-            "category": "metadata",
-            "encoding": "none",
-            "embedding_dim": 0,
-            "description": "제작 국가 (평가 시 다양성 분석)",
+            "encoding": "text",
+            "embedding_dim": config.TEXT_EMBED_DIM,
+            "description": f"줄거리 텍스트 임베딩 ({config.TEXT_EMBED_DIM}D)",
         },
         "title": {
             "category": "identifier",
@@ -152,84 +392,60 @@ def get_data_field_info() -> dict:
             "embedding_dim": 0,
             "description": "영화 제목 (식별자)",
         },
-        "year": {
-            "category": "identifier",
+        "nation": {
+            "category": "metadata",
             "encoding": "none",
             "embedding_dim": 0,
-            "description": "개봉 연도 (식별자)",
+            "description": "제작 국가",
         },
-        # --- 참고용 필드 (임베딩 미사용) ---
-        "director": {
-            "category": "reference",
+        "directors": {
+            "category": "metadata",
             "encoding": "none",
             "embedding_dim": 0,
             "description": "감독",
         },
-        "actors": {
-            "category": "reference",
+        "rating": {
+            "category": "metadata",
             "encoding": "none",
             "embedding_dim": 0,
-            "description": "주요 출연진",
+            "description": "관람 등급",
         },
-        "runtime": {
-            "category": "reference",
+        "posters": {
+            "category": "metadata",
             "encoding": "none",
             "embedding_dim": 0,
-            "description": "상영 시간(분)",
+            "description": "포스터 이미지",
         },
-        "budget_usd": {
-            "category": "reference",
-            "encoding": "none",
-            "embedding_dim": 0,
-            "description": "제작비(USD)",
-        },
-        "audience_count": {
-            "category": "reference",
+        "audiAcc": {
+            "category": "metadata",
             "encoding": "none",
             "embedding_dim": 0,
             "description": "누적 관객수",
         },
-        "release_date": {
-            "category": "reference",
+        "Awards": {
+            "category": "metadata",
             "encoding": "none",
             "embedding_dim": 0,
-            "description": "개봉일",
-        },
-        "original_title": {
-            "category": "reference",
-            "encoding": "none",
-            "embedding_dim": 0,
-            "description": "원제",
-        },
-        "overview": {
-            "category": "reference",
-            "encoding": "none",
-            "embedding_dim": 0,
-            "description": "줄거리 요약",
-        },
-        "tmdb_id": {
-            "category": "reference",
-            "encoding": "none",
-            "embedding_dim": 0,
-            "description": "TMDB ID",
-        },
-        "tmdb_vote_avg": {
-            "category": "reference",
-            "encoding": "none",
-            "embedding_dim": 0,
-            "description": "TMDB 평균 평점",
-        },
-        "tmdb_vote_count": {
-            "category": "reference",
-            "encoding": "none",
-            "embedding_dim": 0,
-            "description": "TMDB 투표 수",
-        },
-        "tmdb_popularity": {
-            "category": "reference",
-            "encoding": "none",
-            "embedding_dim": 0,
-            "description": "TMDB 인기도",
+            "description": "수상 정보",
         },
     }
     return fields
+
+
+if __name__ == "__main__":
+    movies = load_movies(use_cache=False)
+    print(f"\n총 {len(movies):,}편 로드")
+    if movies:
+        m = movies[0]
+        print(f"예시: {m['title']} ({m['year']}) - {m['genres']}")
+        print(f"  줄거리: {m['plot_ko'][:80]}..." if m["plot_ko"] else "  줄거리: 없음")
+        print(f"  키워드(매칭): {m['keywords_matched']}")
+        print(f"  수치: runtime_norm={m['runtime_norm']:.2f}, year_norm={m['year_norm']:.2f}")
+
+    genre_counter = Counter()
+    for m in movies:
+        for g in m["genres"]:
+            genre_counter[g] += 1
+    print("\n장르 분포 (상위 15):")
+    for g, c in genre_counter.most_common(15):
+        print(f"  {g}: {c:,}")

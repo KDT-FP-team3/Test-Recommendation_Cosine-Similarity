@@ -2,6 +2,7 @@ numpy
 scikit-learn
 plotly
 dash
-requests
-python-dotenv
 tqdm
+torch
+sentence-transformers
+Pillow

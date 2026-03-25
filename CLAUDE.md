@@ -1,81 +1,100 @@
-# CLAUDE.md -- AI 영화 추천 시스템 프로젝트 컨텍스트
+# CLAUDE.md -- KMDB 영화 추천 시스템
 
 ## 프로젝트 개요
 
-코사인 유사도 기반 콘텐츠 필터링(Content-Based Filtering) 영화 추천 시스템.
-TMDB/KOBIS 크롤링 데이터 **10,857편(1980~2026.03)**을 학습하고,
-2026년 개봉 예정 **5편** + 자유 텍스트 검색 쿼리에 대해 Top-K 추천.
+코사인 유사도 기반 하이브리드(텍스트+메타데이터) 영화 추천 시스템.
+KMDB(한국영화데이터베이스) **19,354편(1980~2026.03)** 학습, 자유 텍스트 검색 Top-20 추천.
 
 ## 기술 스택
 
-Python 3.12 | NumPy, scikit-learn | Plotly, Dash | PyTorch CUDA(선택) | Requests, tqdm
+Python 3.12 | NumPy, scikit-learn | sentence-transformers(paraphrase-multilingual-MiniLM-L12-v2) | Plotly, Dash | PyTorch CUDA | Pillow, tqdm
 
-## 아키텍처
+## 파이프라인 (6단계)
+
+| 단계 | 파일 | 역할 |
+|------|------|------|
+| 1 | data_loader.py | 554 JSON 파싱, 장르 정규화(66->30), 파생 수치, pkl 캐시 |
+| 2 | embedding.py | 499D 하이브리드 벡터 생성 (그룹별 L2 정규화 + 가중치) |
+| 3 | clustering.py | KMeans(k=12) GPU 군집화 (seed=42) |
+| 4 | reduction.py | PCA/t-SNE 차원 축소 (2D/3D 시각화용) |
+| 5 | recommender.py | 코사인 유사도 Top-20 추천 + 그룹별 기여도 분해 |
+| 6 | evaluator.py | 정량/정성 평가 + 텍스트 일관성 + 적합/부적합 판정 |
+
+### 보조 모듈
+
+| 파일 | 역할 |
+|------|------|
+| config.py | 중앙 파라미터 관리 (장르 매핑, 키워드, 가중치, 임계값) |
+| visualizer.py | 시각화 6종 (Sankey, 2D/3D 산점도, 히트맵, 평가, 기여도) |
+| sensitivity.py | 27조합 민감도 분석 (장르/키워드/텍스트 x 0.5/1.0/1.5) |
+| search.py | 자유 텍스트 검색 엔진 (장르/키워드 별칭 파싱 + 텍스트 임베딩) |
+| dashboard.py | Dash 대시보드 5탭 (검색/클러스터/파라미터/평가/민감도) |
+| main.py | CLI 통합 엔트리포인트 |
+
+### 데이터/출력 디렉토리
+
+| 경로 | 내용 |
+|------|------|
+| Data_new/movies/ | KMDB 원본 (554 JSON + 19,791 포스터 JPG) |
+| data/ | 캐시 (kmdb_processed.pkl, text_embeddings.npy) |
+| results/ | HTML 시각화 6종 |
+
+## 하이브리드 임베딩 (499D)
 
 ```
-crawler.py          TMDB/KOBIS 크롤링 → data/movies.json (10,857편)
-config.py           중앙 파라미터 관리
-data_loader.py      Stage 1: 데이터 로드/검증/결측치 처리
-embedding.py        Stage 2: 54D 가중 벡터 (17장르 + 30키워드 + 7수치) + StandardScaler
-clustering.py       Stage 3: KMeans(k=8) 군집화 (GPU seed=42 결정성 보장)
-reduction.py        Stage 4: PCA/t-SNE 차원 축소 (2D/3D)
-recommender.py      Stage 5: 코사인 유사도 Top-K 추천
-evaluator.py        Stage 6: 정량/정성 평가 + 적합/부적합 판정
-visualizer.py       시각화 7종 (Sankey, 2D/3D, 히트맵, 평가, 민감도)
-sensitivity.py      27조합 민감도 분석 (상1.5/중1.0/하0.5)³
-search.py           자유 텍스트 → 54D 벡터 변환 → 추천
-dashboard.py        Dash 대시보드 (5탭: 시각화/추천/평가/스윕/민감도)
-main.py             CLI 통합 엔트리포인트
-results/            HTML 출력 (summary.html 포함 7개)
+V = [L2norm(genre)*Wg | L2norm(keyword)*Wk | L2norm(numeric)*Wn | L2norm(text)*Wt]
+     30D one-hot        80D binary           5D derived            384D sentence-transformers
 ```
+
+| 그룹 | 차원 | 기본 가중치 | 설명 |
+|------|------|------------|------|
+| 장르 | 30D | 1.0 | KMDB 66종 -> 30개 표준 카테고리 원-핫 |
+| 키워드 | 80D | 1.0 | 빈도 상위 80개 바이너리 |
+| 수치 | 5D | 0.5 | runtime_norm, year_norm, keyword_richness, cast_size_norm, genre_count_norm |
+| 텍스트 | 384D | 1.5 | paraphrase-multilingual-MiniLM-L12-v2 줄거리 임베딩 |
+
+**정규화**: 그룹별 L2 정규화 후 가중치 곱 -> 연결(concatenate). 차원 수 차이(30D vs 384D) 편향 방지.
 
 ## 핵심 수식
 
 | 연산 | 수식 | 용도 |
 |------|------|------|
-| 벡터 생성 | V = [genre×Wg \| kw×Wk \| num×Wn] (54D) | 영화 → 벡터 |
-| 표준화 | X_scaled = (X - μ) / σ | 스케일 통일 |
-| 코사인 유사도 | cos(A,B) = A·B / (\|\|A\|\|×\|\|B\|\|) | 추천 순위 |
+| L2 정규화 | g_norm = g / \|\|g\|\|_2 | 그룹별 차원 편향 방지 |
+| 벡터 생성 | V = [g*Wg \| k*Wk \| n*Wn \| t*Wt] (499D) | 하이브리드 벡터 |
+| 코사인 유사도 | cos(A,B) = A.B / (\|\|A\|\| x \|\|B\|\|) | 추천 순위 |
 | KMeans | centroid = mean(X[label==c]) | 군집화 |
-| PCA | X_reduced = (X-μ) @ Vᵀ[:n] | 시각화 |
-| Spearman ρ | 1 - 6Σd²/(n(n²-1)) | 민감도 순위상관 |
+| PCA | X_reduced = (X-mu) @ V^T[:n] | 시각화 |
+| Spearman rho | 1 - 6*sum(d^2) / (n*(n^2-1)) | 민감도 순위상관 |
 
 ## 실행 명령어
 
 ```bash
 pip install -r requirements.txt
-python main.py                    # 기본 파이프라인 (6단계 + 시각화 5개)
-python main.py --sensitivity      # 27조합 민감도 분석
-python main.py --dashboard        # 대시보드 (http://127.0.0.1:8050)
-python main.py --sweep            # 파라미터 스윕 비교
-python main.py --search           # 인터랙티브 검색
-python main.py --examples         # 검색 예시 실행
-python crawler.py --resume        # 데이터 크롤링 (이어받기)
+python main.py --build-cache         # 데이터 캐시 생성 (첫 실행)
+python main.py                       # 전체 파이프라인 (6단계 + 시각화)
+python main.py --sensitivity         # 27조합 민감도 분석
+python main.py --dashboard           # 대시보드 (http://127.0.0.1:8050)
+python main.py --sweep               # 파라미터 스윕 비교
+python main.py --search              # 인터랙티브 검색
+python main.py --examples            # 검색 예시
 ```
 
-## 출력 파일 (results/)
+## 주의사항
 
-| 파일 | 내용 |
-|------|------|
-| summary.html | 종합 보고서 (14개 섹션, 수식/흐름도 포함) |
-| data_field_diagram.html | 24개 필드 → 54D 매핑 Sankey |
-| embedding_3d.html | 3D 산점도 (클러스터 + 추천 연결선) |
-| embedding_2d.html | 2D 산점도 (클러스터 라벨 + PCA 축 해석) |
-| similarity_heatmap.html | 테스트 5편 × 학습 영화 유사도 |
-| evaluation_report.html | 평가 4개 차트 (막대 위 수치 표시) |
-| sensitivity_analysis.html | 27조합 차트 + 상세 비교표 + 순위 비교 |
-
-## 데이터 주의사항
-
-- `config.py`의 ALL_GENRES/ALL_KEYWORDS 변경 시 벡터 차원이 변경됨
-- 수치 특징은 0.0~1.0 범위 유지 필수
-- runtime=0은 결측치(None)로 처리됨
-- budget_usd=0.0은 budget_scale=0.10으로 처리 (결측)
-- critic_score/audience_score None → 0.5 대체
+- ALL_GENRES/ALL_KEYWORDS 변경 시 벡터 차원 변경됨 -> 캐시 삭제 필요
+- GENRE_MAP에 없는 장르는 무시됨
+- runtime=0 또는 None -> runtime_norm=0.5 (결측치 처리)
+- text_embeddings.npy는 영화 수 변경 시 자동 재생성
+- kmdb_processed.pkl 삭제 시 554 JSON 재파싱
+- sentence-transformers 미설치 시 텍스트 임베딩이 0벡터로 대체됨 (추천 품질 저하)
+- tensorflow가 설치된 환경에서는 protobuf 충돌로 sentence-transformers import 실패 가능 -> tensorflow 제거 필요
 
 ## 코드 수정 가이드
 
-- **파라미터 변경**: config.py 또는 대시보드 실시간 조정
-- **테스트 영화 추가**: config.py TEST_MOVIES에 동일 dict 구조로 추가
-- **민감도 레벨 변경**: config.py SENSITIVITY_LEVELS (상/중/하 값)
-- **크롤링 범위 변경**: crawler.py START_DATE/END_DATE + YEAR_CHUNKS
+- **파라미터 변경**: config.py 수정 또는 대시보드 실시간 조정
+- **장르 매핑 추가**: config.py GENRE_MAP에 {원본: 표준} 추가
+- **키워드 목록 변경**: config.py ALL_KEYWORDS 수정 (중복 금지, 차원 변경 주의)
+- **테스트 영화 변경**: config.py TEST_MOVIE_TITLES 지정 또는 자동 선정
+- **가중치 변경**: config.py WEIGHT_GENRE/KEYWORD/NUMERIC/TEXT 또는 대시보드 슬라이더
+- **텍스트 모델 변경**: config.py TEXT_MODEL_NAME (차원 변경 시 TEXT_EMBED_DIM도 수정)
+- **평가 임계값 변경**: config.py THRESHOLD_GENRE_PRECISION/AVG_SIMILARITY/3D_DISTANCE

@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import sys; sys.stdout.buffer.write\\(sys.stdin.buffer.read\\(\\)\\)\")",
+      "Bash(python -c \":*)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''visualizer.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''Syntax OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''dashboard.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''Syntax OK''\\)\")",
+      "Bash(rm -f data/movies.json data/checkpoint.json data/movie_data_crawled.py)",
+      "Bash(rm -f results/summary.html results/data_field_diagram.html results/embedding_2d.html results/embedding_3d.html results/evaluation_report.html results/sensitivity_analysis.html results/similarity_heatmap.html)",
+      "Bash(rm -f crawler.py)",
+      "Bash(python main.py --build-cache)",
+      "Bash(python main.py)",
+      "Bash(python -c \"import sentence_transformers; print\\(sentence_transformers.__version__\\)\")",
+      "Bash(pip install:*)",
+      "Bash(python -c \"from sentence_transformers import SentenceTransformer; print\\(''OK''\\)\")",
+      "Bash(TRANSFORMERS_NO_TF=1 python -c \"from sentence_transformers import SentenceTransformer; print\\(''OK''\\)\")",
+      "Bash(pip uninstall:*)",
+      "Bash(python3 -m py_compile config.py data_loader.py embedding.py clustering.py reduction.py recommender.py evaluator.py visualizer.py sensitivity.py search.py dashboard.py main.py)",
+      "Bash(python3:*)",
+      "Bash(python -c \"import config; print\\(len\\(config.ALL_KEYWORDS\\), len\\(set\\(config.ALL_KEYWORDS\\)\\)\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''sensitivity.py'', doraise=True\\); print\\(''sensitivity.py OK''\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''visualizer.py'', doraise=True\\); print\\(''visualizer.py OK''\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''main.py'', doraise=True\\); print\\(''main.py OK''\\)\")",
+      "Bash(python main.py --sensitivity)",
+      "Bash(ls -la results/*.html)"
+    ]
+  }
+}
