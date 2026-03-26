@@ -218,7 +218,9 @@ code { background: var(--bg-inline-code); padding: 2px 6px; border-radius: 3px; 
 <a href="#implementation">구현 상세</a>
 <a href="#evaluation">평가</a>
 <a href="#sensitivity">민감도</a>
-<a href="#limitations">한계 및 개선</a>
+<a href="#optimization">최적화</a>
+<a href="#persistence">영속화</a>
+<a href="#limitations">한계</a>
 </div>
 </div>
 </nav>
@@ -236,9 +238,11 @@ code { background: var(--bg-inline-code); padding: 2px 6px; border-radius: 3px; 
 <li><a href="#flow">처리 흐름</a> -- 6단계 파이프라인 상세</li>
 <li><a href="#formulas">수식 체계</a> -- 벡터 생성, 유사도, 군집화, 차원 축소, 순위 상관</li>
 <li><a href="#formula-relations">수식 항의 관계</a> -- 각 수식이 시스템에서 어떻게 연결되는가</li>
-<li><a href="#implementation">구현 상세</a> -- 모듈별 코드 설계, GPU 가속, 캐싱</li>
+<li><a href="#implementation">구현 상세</a> -- 모듈별 코드 설계, GPU 가속, 캐싱, 검색 엔진(4단계 파싱/퍼지 매칭), 대시보드 UX</li>
 <li><a href="#evaluation">평가 체계</a> -- 정량/정성 메트릭, 적합/부적합 판정</li>
-<li><a href="#sensitivity">민감도 분석</a> -- 27조합 파라미터 영향 분석</li>
+<li><a href="#sensitivity">민감도 분석</a> -- 81조합 파라미터 영향 분석, 기여도 산출</li>
+<li><a href="#optimization">가중치 최적화</a> -- 시뮬레이티드 어닐링, 복합 목적함수, 신뢰도/정확도</li>
+<li><a href="#persistence">가중치 영속화</a> -- JSON 파일 기반 가중치 저장/로드</li>
 <li><a href="#limitations">한계 및 개선 방향</a></li>
 </ol>
 </div>
@@ -263,7 +267,7 @@ code { background: var(--bg-inline-code); padding: 2px 6px; border-radius: 3px; 
 </div>
 <div class="card">
 <h4>출력</h4>
-<p>Top-20 추천 목록<br>그룹별 기여도 분해<br>7종 인터랙티브 시각화<br>27조합 민감도 분석</p>
+<p>Top-20 추천 목록<br>그룹별 기여도 분해<br>7종 인터랙티브 시각화<br>81조합 민감도 분석 + 기여도</p>
 </div>
 </div>
 
@@ -722,9 +726,9 @@ cos(V<sub>A</sub>, V<sub>B</sub>) = (V<sub>A</sub> . V<sub>B</sub>) / (||V<sub>A
 <table>
 <tr><th>변경 대상</th><th>영향받는 수식</th><th>측정하는 것</th></tr>
 <tr>
-<td>W<sub>g</sub>, W<sub>k</sub>, W<sub>t</sub> 변경</td>
-<td>벡터 생성 수식에서 가중치 변경 &rarr; raw_vectors 재생성 &rarr; 코사인 유사도 변경</td>
-<td>Top-20 목록 변화</td>
+<td>W<sub>g</sub>, W<sub>k</sub>, W<sub>n</sub>, W<sub>t</sub> 변경</td>
+<td>벡터 생성 수식에서 4개 가중치 변경 &rarr; raw_vectors 재생성 &rarr; 코사인 유사도 변경</td>
+<td>Top-20 목록 변화 (81조합)</td>
 </tr>
 <tr>
 <td>Top-20 목록 비교</td>
@@ -759,7 +763,8 @@ cos(V<sub>A</sub>, V<sub>B</sub>) = (V<sub>A</sub> . V<sub>B</sub>) / (||V<sub>A
 <tr><td>recommender.py</td><td><code>MovieRecommender</code></td><td>Top-20 추천</td><td>query vector &rarr; ranked list</td></tr>
 <tr><td>evaluator.py</td><td><code>RecommendationEvaluator</code></td><td>정량/정성 평가</td><td>recommendations &rarr; metrics</td></tr>
 <tr><td>search.py</td><td><code>MovieSearchEngine</code></td><td>자유 검색</td><td>text query &rarr; Top-20</td></tr>
-<tr><td>sensitivity.py</td><td><code>SensitivityAnalyzer</code></td><td>27조합 분석</td><td>weights grid &rarr; analysis</td></tr>
+<tr><td>sensitivity.py</td><td><code>SensitivityAnalyzer</code></td><td>81조합 분석 + 기여도</td><td>weights grid &rarr; analysis + importance</td></tr>
+<tr><td>optimizer.py</td><td><code>WeightOptimizer</code></td><td>시뮬레이티드 어닐링</td><td>initial weights &rarr; optimal weights</td></tr>
 <tr><td>visualizer.py</td><td><code>MovieVisualizer</code></td><td>HTML 시각화</td><td>pipeline result &rarr; 7 HTML files</td></tr>
 <tr><td>dashboard.py</td><td>Dash app</td><td>인터랙티브 UI</td><td>-- &rarr; http://127.0.0.1:8050</td></tr>
 <tr><td>main.py</td><td><code>run_pipeline()</code></td><td>CLI 통합</td><td>args &rarr; pipeline execution</td></tr>
@@ -800,6 +805,96 @@ cos(V<sub>A</sub>, V<sub>B</sub>) = (V<sub>A</sub> . V<sub>B</sub>) / (||V<sub>A
     t_n = F.normalize(t, dim=1)                               <span style="color:#6c7086"># L2 정규화</span>
     sims = (q_n @ t_n.T).squeeze(0)                           <span style="color:#6c7086"># (N,) 유사도</span>
     <span style="color:#6c7086"># 내림차순 정렬하여 Top-K 반환</span></div>
+
+<h3>7.5 검색 엔진 (search.py)</h3>
+
+<p>사용자 자유 텍스트 입력에서 장르/키워드를 자동 추출하여 쿼리 벡터를 구성하는 <strong>4단계 파싱</strong> 엔진.</p>
+
+<h4>4단계 쿼리 파싱</h4>
+<table class="table-sm">
+<tr><th>단계</th><th>방식</th><th>사전 크기</th><th>예시</th></tr>
+<tr><td>1. 정확 매칭</td><td>장르/키워드 별칭 사전에서 단어 단위 매칭</td><td>장르 100+, 키워드 70+</td><td>"코메디" → 코미디, "sf" → SF</td></tr>
+<tr><td>2. 부분 매칭</td><td>복합어 내 부분 문자열 매칭</td><td>동일 사전</td><td>"공상과학영화" → SF</td></tr>
+<tr><td>3. 정규화</td><td>공백 제거, 오타 치환표 적용 후 재매칭</td><td>치환 규칙</td><td>"멜 로" → 로맨스</td></tr>
+<tr><td>4. 퍼지 매칭</td><td>한글 자모 분해 + 레벤슈타인 편집 거리</td><td>동적 계산</td><td>"액숀" → 액션 (거리 1)</td></tr>
+</table>
+
+<h4>퍼지 매칭 상세</h4>
+<div class="formula-block">
+한글 자모 분해 (Jamo Decomposition):
+  "액" → (ㅇ, ㅐ, ㄱ),  "션" → (ㅅ, ㅕ, ㄴ)  <span class="comment"># 초성/중성/종성 분리</span>
+
+편집 거리 (Levenshtein Distance):
+  d("액숀", "액션") = 1                          <span class="comment"># DP 기반, 자모 단위 비교</span>
+
+음절 수별 허용 임계값:
+  1음절: 매칭 안 함  <span class="comment"># 오탐 방지 (예: "사"→"SF" 방지)</span>
+  2음절: ≤ 1         <span class="comment"># 최소 변동만 허용</span>
+  3음절+: ≤ 3        <span class="comment"># 오타/방언/변형 허용</span>
+</div>
+
+<h4>별칭 사전 구조</h4>
+<div class="grid-2">
+<div class="card">
+<h4>장르 별칭 (100+ 매핑)</h4>
+<p>한국어 + 영어 지원<br>
+"코메디" → 코미디<br>
+"thriller", "스릴러물" → 스릴러<br>
+"사이파이", "공상과학" → SF<br>
+"멜로", "연애" → 로맨스</p>
+</div>
+<div class="card">
+<h4>키워드 별칭 (70+ 매핑)</h4>
+<p>유의어/영어 매핑<br>
+"살인", "murder" → 살인<br>
+"마약", "drugs" → 마약<br>
+"고등학교", "학교" → 학교<br>
+"외계인", "alien" → 외계인</p>
+</div>
+</div>
+
+<h3>7.6 대시보드 구현 (dashboard.py)</h3>
+
+<p>Dash 기반 5탭 인터랙티브 대시보드의 핵심 UX 구현 사항.</p>
+
+<h4>UI 아키텍처</h4>
+<table class="table-sm">
+<tr><th>기능</th><th>구현 방식</th><th>효과</th></tr>
+<tr><td>Enter 키 검색</td><td>Input 컴포넌트의 <code>n_submit</code> 속성 트리거</td><td>버튼 클릭 없이 즉시 검색 실행</td></tr>
+<tr><td>탭 상태 보존</td><td>display CSS 토글 (라우팅 아님)</td><td>탭 전환 시 이전 탭의 검색 결과/차트/입력 유지</td></tr>
+<tr><td>Sticky 헤더</td><td>position:fixed, z-index: 1000(타이틀) / 999(탭 바)</td><td>스크롤 시에도 네비게이션 고정</td></tr>
+<tr><td>실시간 폴링</td><td>Dash Interval 컴포넌트 (500ms)</td><td>최적화/민감도 진행률 실시간 갱신</td></tr>
+<tr><td>기여 예시 패널</td><td>Tab 1 하단에 3종 박스</td><td>장르/키워드/텍스트 주도 추천 Top-3 예시 표시</td></tr>
+<tr><td>메트릭 배경색</td><td>사분위 기반 그래디언트</td><td>민감도 테이블에서 수치 크기를 색상으로 직관 표현</td></tr>
+<tr><td>수준별 색상</td><td>상=파랑(#3498db), 중=초록(#27ae60), 하=주황(#e67e22)</td><td>81조합 테이블에서 가중치 수준 즉시 식별</td></tr>
+</table>
+
+<h4>상태 관리 구조</h4>
+<div class="code-block"><span style="color:#6c7086"># 가중치 상태 (되돌리기 지원)</span>
+_weight_state = {"previous": {genre, keyword, numeric, text}, "current": {...}}
+
+<span style="color:#6c7086"># 최적화 상태 (threading + Interval 폴링)</span>
+_sim_state = {
+    "running": bool, "done": bool, "progress": int,
+    "best_weights": dict, "best_score": float,
+    "confidence": float, "accuracy": float, "history": list
+}
+
+<span style="color:#6c7086"># 민감도 분석 상태 (threading + Interval 폴링)</span>
+_sensitivity_progress = {
+    "current": int, "total": 81, "running": bool,
+    "done": bool, "analysis": list
+}</div>
+
+<h4>콜백 의존성</h4>
+<table class="table-sm">
+<tr><th>트리거</th><th>콜백</th><th>출력</th></tr>
+<tr><td>검색 버튼 / Enter 키</td><td>search → results</td><td>영화 카드 그리드 + 기여 예시 + 검색 정보</td></tr>
+<tr><td>가중치 적용 버튼</td><td>apply → overlap</td><td>진입/이탈 영화 비교 테이블</td></tr>
+<tr><td>시뮬레이션 버튼</td><td>start → threading</td><td>진행률 바 + 가중치 카드 + 이력 차트</td></tr>
+<tr><td>저장 및 반영 버튼</td><td>save → JSON</td><td>슬라이더 업데이트 + JSON 영속화</td></tr>
+<tr><td>민감도 실행 버튼</td><td>start → threading</td><td>진행률 + 기여도 차트/카드 + 히트맵 + 테이블</td></tr>
+</table>
 </div>
 
 <!-- 8. 평가 체계 -->
@@ -840,51 +935,253 @@ cos(V<sub>A</sub>, V<sub>B</sub>) = (V<sub>A</sub> . V<sub>B</sub>) / (||V<sub>A
 
 <!-- 9. 민감도 분석 -->
 <div class="section" id="sensitivity">
-<h2>9. 민감도 분석 (27조합)</h2>
+<h2>9. 민감도 분석 (81조합) 및 기여도 산출</h2>
 
 <h3>9.1 설계</h3>
-<p>장르(W<sub>g</sub>), 키워드(W<sub>k</sub>), 텍스트(W<sub>t</sub>) 가중치를 각각 3단계(하=0.5, 중=1.0, 상=1.5)로 설정하여
-3<sup>3</sup> = <strong>27가지</strong> 조합을 탐색한다. 수치 가중치(W<sub>n</sub>)는 0.5로 고정한다.</p>
+<p>장르(W<sub>g</sub>), 키워드(W<sub>k</sub>), 수치(W<sub>n</sub>), 텍스트(W<sub>t</sub>) 4개 가중치를 각각 3단계(하=0.5, 중=1.0, 상=1.5)로 설정하여
+3<sup>4</sup> = <strong>81가지</strong> 조합을 탐색한다.</p>
 
-<p>기준선: (중, 중, 중) = (1.0, 1.0, 1.0)</p>
+<p>기준선(Baseline): (중, 중, 중, 중) = (W<sub>g</sub>=1.0, W<sub>k</sub>=1.0, W<sub>n</sub>=1.0, W<sub>t</sub>=1.0)</p>
 
-<h3>9.2 측정 메트릭</h3>
+<div class="formula-block">
+조합 공간: {0.5, 1.0, 1.5}<sup>4</sup> = 81조합
+<span class="comment"># 장르 x 키워드 x 수치 x 텍스트 각각 3단계</span>
+
+각 조합 c = (W<sub>g</sub><sup>c</sup>, W<sub>k</sub><sup>c</sup>, W<sub>n</sub><sup>c</sup>, W<sub>t</sub><sup>c</sup>) 에 대해:
+
+1) V<sup>c</sup> = [L2(g)·W<sub>g</sub><sup>c</sup> | L2(k)·W<sub>k</sub><sup>c</sup> | L2(n)·W<sub>n</sub><sup>c</sup> | L2(t)·W<sub>t</sub><sup>c</sup>]  <span class="comment"># 499D 벡터 재생성</span>
+2) Top20<sup>c</sup> = argsort(cos(V<sub>query</sub><sup>c</sup>, V<sub>train</sub><sup>c</sup>))[:20]            <span class="comment"># 추천 목록 생성</span>
+3) 기준선 Top20<sup>base</sup> 와 비교하여 5개 메트릭 측정                      <span class="comment"># 변화량 정량화</span>
+</div>
+
+<h3>9.2 측정 메트릭 (기준선 대비)</h3>
 <table>
-<tr><th>메트릭</th><th>수식</th><th>의미</th></tr>
-<tr><td>겹침률 (Overlap)</td><td>|Top20_base &cap; Top20_combo| / 20</td><td>기준선과 동일한 영화의 비율</td></tr>
-<tr><td>Spearman rho</td><td>1 - 6*SUM(d<sup>2</sup>)/(n(n<sup>2</sup>-1))</td><td>공통 영화의 순위 상관 (-1~1)</td></tr>
-<tr><td>평균 순위 변동</td><td>mean(|rank_base - rank_combo|)</td><td>순위 이동 폭 (낮을수록 안정)</td></tr>
-<tr><td>평균 유사도</td><td>mean(cos_sim)</td><td>해당 조합의 추천 품질</td></tr>
-<tr><td>장르 정밀도</td><td>(장르 일치 수) / K</td><td>장르 관련성 변화</td></tr>
+<tr><th>메트릭</th><th>수식</th><th>범위</th><th>의미</th></tr>
+<tr><td>겹침률 (Overlap)</td><td>|Top20<sup>base</sup> &cap; Top20<sup>c</sup>| / 20</td><td>0 ~ 1</td><td>기준선과 동일한 영화의 비율. 1이면 변화 없음</td></tr>
+<tr><td>Spearman &rho;</td><td>1 - 6&middot;&Sigma;d<sub>i</sub><sup>2</sup> / (n(n<sup>2</sup>-1))</td><td>-1 ~ 1</td><td>공통 영화의 순위 상관. 1=동일 순서, 0=무관</td></tr>
+<tr><td>평균 순위 변동</td><td>&Sigma;(|rank<sub>base</sub>(i) - rank<sub>c</sub>(i)| or K) / K</td><td>0 ~</td><td>평균 순위 이동 폭. 이탈 영화는 K로 간주</td></tr>
+<tr><td>평균 유사도</td><td>mean(cos(V<sub>q</sub><sup>c</sup>, V<sub>i</sub><sup>c</sup>))</td><td>0 ~ 1</td><td>해당 조합의 추천 품질 지표</td></tr>
+<tr><td>장르 정밀도</td><td>(장르 1개 이상 공유) / K</td><td>0 ~ 1</td><td>장르 관련성 변화</td></tr>
 </table>
 
 <h3>9.3 분석 과정</h3>
 <ol class="styled-list">
-<li>기준선(1.0, 1.0, 1.0)으로 테스트 영화에 대한 Top-20 생성</li>
-<li>27개 조합 각각에 대해 <code>rebuild_with_weights()</code>로 벡터 재생성 (텍스트 임베딩 재계산 없이 가중치만 변경)</li>
-<li>각 조합의 Top-20과 기준선 비교: 겹침률, Spearman rho, 순위 변동 계산</li>
-<li>테스트 영화 전체의 평균으로 집계</li>
-<li>결과를 sensitivity_analysis.html로 시각화</li>
+<li>기준선(1.0, 1.0, 1.0, 1.0)으로 테스트 영화에 대한 Top-20 생성</li>
+<li>81개 조합 각각에 대해 <code>rebuild_with_weights()</code>로 벡터 재생성 (텍스트 임베딩 재계산 없이 4개 가중치만 변경)</li>
+<li>각 조합의 Top-20과 기준선 비교: 겹침률, Spearman &rho;, 순위 변동, 평균 유사도, 장르 정밀도 계산</li>
+<li>테스트 영화 &times; 81조합 = 전체 분석 결과 집계</li>
+<li>기여도 산출(Contribution Importance) 수행</li>
 </ol>
 
-<h3>9.4 해석 가이드</h3>
+<h3>9.4 기여도 산출 방식 (Contribution Importance)</h3>
+
+<p>각 파라미터(장르/키워드/수치/텍스트)가 추천 결과에 미치는 영향력을 <strong>Marginal Range</strong> 방식으로 정량화한다.</p>
+
+<div class="formula-block">
+<strong>기여도 산출 알고리즘</strong>
+
+파라미터 P &isin; {W<sub>g</sub>, W<sub>k</sub>, W<sub>n</sub>, W<sub>t</sub>} 에 대해:
+
+1) 수준별 평균 유사도 계산:
+   &mu;<sub>P=하</sub> = mean(avg_similarity | P=0.5)   <span class="comment"># P가 "하"인 모든 조합(27개)의 평균 유사도</span>
+   &mu;<sub>P=중</sub> = mean(avg_similarity | P=1.0)   <span class="comment"># P가 "중"인 모든 조합(27개)의 평균 유사도</span>
+   &mu;<sub>P=상</sub> = mean(avg_similarity | P=1.5)   <span class="comment"># P가 "상"인 모든 조합(27개)의 평균 유사도</span>
+
+2) 중요도(Importance) = max(&mu;<sub>하</sub>, &mu;<sub>중</sub>, &mu;<sub>상</sub>) - min(&mu;<sub>하</sub>, &mu;<sub>중</sub>, &mu;<sub>상</sub>)
+   <span class="comment"># 수준별 평균의 최대-최소 범위. 범위가 클수록 영향력이 큼</span>
+
+3) 최적 수준(Best Level) = argmax(&mu;<sub>하</sub>, &mu;<sub>중</sub>, &mu;<sub>상</sub>)
+   <span class="comment"># 평균 유사도가 가장 높은 수준</span>
+
+4) 4개 파라미터를 중요도 내림차순으로 정렬하여 기여도 순위 결정
+</div>
+
+<h4>기여도 해석</h4>
+<table>
+<tr><th>기여도 크기</th><th>의미</th><th>예시</th></tr>
+<tr><td>높음 (예: 0.05+)</td><td>해당 가중치 변경이 추천 결과를 크게 바꿈</td><td>텍스트 가중치: 줄거리 기반 유사도가 지배적</td></tr>
+<tr><td>중간 (예: 0.01~0.05)</td><td>의미 있는 영향이 있으나 지배적이지 않음</td><td>장르 가중치: 장르 일치가 부분적으로 기여</td></tr>
+<tr><td>낮음 (예: &lt;0.01)</td><td>해당 가중치 변경이 추천에 미미한 영향</td><td>수치 가중치: 5D로 차원이 작아 영향 제한적</td></tr>
+</table>
+
+<h3>9.5 해석 가이드</h3>
 <div class="grid-2">
 <div class="card">
-<h4>높은 겹침률 + 높은 Spearman rho</h4>
+<h4>높은 겹침률 + 높은 Spearman &rho;</h4>
 <p>가중치 변경이 추천에 미치는 영향이 적다. 해당 그룹의 정보가 다른 그룹과 중복되거나, 추천에 결정적이지 않다.</p>
 </div>
 <div class="card">
-<h4>낮은 겹침률 + 낮은 Spearman rho</h4>
+<h4>낮은 겹침률 + 낮은 Spearman &rho;</h4>
 <p>가중치 변경이 추천을 크게 바꾼다. 해당 그룹이 추천 결과에 강한 영향력을 가진다.</p>
 </div>
+<div class="card">
+<h4>기여도 1위 = 텍스트</h4>
+<p>384D 줄거리 임베딩이 유사도를 지배. 장르나 키워드보다 줄거리의 의미적 유사성이 추천을 결정.</p>
+</div>
+<div class="card">
+<h4>기여도 1위 = 장르</h4>
+<p>장르 일치가 추천의 핵심. 같은 장르 내에서 세부 차이를 텍스트/키워드가 보완.</p>
 </div>
 </div>
 
-<!-- 10. 한계 및 개선 방향 -->
+<h3>9.6 대시보드 시각화</h3>
+<p>대시보드 탭 5(민감도 분석)에서 81조합 분석 실행 시:</p>
+<ol class="styled-list">
+<li><strong>기여도 막대 차트</strong>: 4개 파라미터의 중요도를 내림차순 막대 그래프로 표시</li>
+<li><strong>기여도 카드</strong>: 순위별 파라미터명, 중요도, 최적 수준, 수준별 평균 유사도</li>
+<li><strong>히트맵</strong>: 81조합 &times; 쿼리별 겹침률 (YlOrRd 색상 스케일)</li>
+<li><strong>상세 테이블</strong>: 유사도 내림차순 상위 50건, 수준별 배경색(상=파랑, 중=초록, 하=주황), 메트릭별 사분위 배경색</li>
+</ol>
+</div>
+
+<!-- 10. 가중치 최적화 -->
+<div class="section" id="optimization">
+<h2>10. 가중치 최적화 (시뮬레이티드 어닐링)</h2>
+
+<h3>10.1 개요</h3>
+<p>4개 가중치(W<sub>g</sub>, W<sub>k</sub>, W<sub>n</sub>, W<sub>t</sub>)의 최적 조합을 <strong>시뮬레이티드 어닐링(Simulated Annealing)</strong>으로 탐색한다.
+이 메타휴리스틱 최적화는 격자 탐색(Grid Search)보다 넓은 연속 공간을 효율적으로 탐색하며,
+지역 최적해(local optimum)에 빠지지 않도록 확률적 이동을 허용한다.</p>
+
+<h3>10.2 복합 목적함수 (Composite Score)</h3>
+
+<div class="formula-block">
+<strong>S(w) = 0.35 &middot; avg_similarity + 0.30 &middot; genre_precision + 0.25 &middot; text_coherence - 0.10 &middot; |diversity - 0.3|</strong>
+
+각 항의 역할:
+  avg_similarity   (0.35) : 추천 영화의 평균 코사인 유사도          <span class="comment"># 높을수록 유사한 영화 추천</span>
+  genre_precision  (0.30) : Top-20 중 쿼리와 장르 공유 비율         <span class="comment"># 높을수록 장르 관련성 높음</span>
+  text_coherence   (0.25) : 추천 영화 줄거리 간 의미적 일관성       <span class="comment"># 높을수록 주제 일관</span>
+  diversity_penalty(0.10) : |diversity - 0.3|                        <span class="comment"># 0.3이 이상적 다양성, 편차 시 감점</span>
+</div>
+
+<h4>항들의 관계</h4>
+<table>
+<tr><th>항</th><th>계수</th><th>방향</th><th>다른 항과의 관계</th></tr>
+<tr><td>avg_similarity</td><td>0.35 (최대)</td><td>최대화</td><td>높이면 diversity가 낮아지는 경향 (trade-off)</td></tr>
+<tr><td>genre_precision</td><td>0.30</td><td>최대화</td><td>장르 가중치 증가 시 개선, 텍스트 가중치와 독립</td></tr>
+<tr><td>text_coherence</td><td>0.25</td><td>최대화</td><td>텍스트 가중치 증가 시 개선, 장르와 부분 상관</td></tr>
+<tr><td>diversity_penalty</td><td>0.10</td><td>최소화</td><td>similarity와 역상관: 유사도 높이면 다양성 감소</td></tr>
+</table>
+
+<div class="highlight-blue highlight">
+<strong>설계 의도</strong>: 유사도(0.35)와 장르 정밀도(0.30)를 합쳐 0.65로 "정확성"을 주로 추구하되, 텍스트 일관성(0.25)으로 의미적 품질을 보장하고, 다양성 패널티(0.10)로 단조로운 추천을 방지한다. 다양성 목표값 0.3은 "적당히 다양하되 주제에서 벗어나지 않는" 균형점이다.
+</div>
+
+<h3>10.3 시뮬레이티드 어닐링 알고리즘</h3>
+
+<div class="formula-block">
+<strong>알고리즘 (optimizer.py)</strong>
+
+초기 설정:
+  w<sub>current</sub> = 사용자 지정 초기 가중치 (슬라이더 값)
+  T<sub>0</sub> = 1.0              <span class="comment"># 초기 온도</span>
+  &alpha; = 0.92             <span class="comment"># 냉각률 (기하 냉각)</span>
+  step = 0.2             <span class="comment"># 이웃 탐색 반경</span>
+  patience = 10          <span class="comment"># 개선 없이 허용하는 반복 수</span>
+
+반복 (최대 50회):
+  1) 이웃 생성:
+     key = 무작위 선택(genre, keyword, numeric, text)
+     &delta; = Uniform(-step, +step)
+     w<sub>neighbor</sub>[key] = clip(w<sub>current</sub>[key] + &delta;, 0.1, 3.0)
+
+  2) 평가:
+     S<sub>neighbor</sub> = S(w<sub>neighbor</sub>)     <span class="comment"># 복합 목적함수 계산</span>
+
+  3) 수락 판정:
+     &Delta;S = S<sub>neighbor</sub> - S<sub>current</sub>
+     if &Delta;S &gt; 0:
+       accept                <span class="comment"># 항상 개선 수락</span>
+     else:
+       P(accept) = exp(&Delta;S / T)  <span class="comment"># 확률적 악화 수락</span>
+
+  4) 온도 감소:
+     T &larr; &alpha; &middot; T           <span class="comment"># T_n = 0.92^n (기하급수 냉각)</span>
+
+  5) 조기 종료:
+     patience 회 연속 미개선 시 중단
+</div>
+
+<h3>10.4 신뢰도 (Confidence) 산출</h3>
+
+<div class="formula-block">
+Confidence = 0.4 &middot; stability + 0.4 &middot; reproducibility + 0.2 &middot; convergence
+
+stability       = max(0, 1 - std(tail_25%_scores) &middot; 10)       <span class="comment"># 후반부 점수 안정성</span>
+reproducibility = min(1, count(|score - best| &lt; 0.05·best) / (n·0.3))  <span class="comment"># 최적 근처 도달 빈도</span>
+convergence     = min(1, n / 20)                                  <span class="comment"># 충분한 탐색 여부</span>
+</div>
+
+<table class="table-sm">
+<tr><th>요소</th><th>가중치</th><th>의미</th></tr>
+<tr><td>stability</td><td>0.4</td><td>탐색 후반부 점수의 표준편차가 작을수록 안정적으로 수렴</td></tr>
+<tr><td>reproducibility</td><td>0.4</td><td>최적값 근처(5% 이내)에 자주 도달할수록 재현성 높음</td></tr>
+<tr><td>convergence</td><td>0.2</td><td>최소 20회 이상 탐색했으면 충분한 탐색으로 간주</td></tr>
+</table>
+
+<h3>10.5 정확도 (Accuracy) 산출</h3>
+
+<div class="formula-block">
+Accuracy = (통과한 조건 수) / 4
+
+조건:
+  1) avg_similarity &ge; 0.5   <span class="comment"># THRESHOLD_AVG_SIMILARITY</span>
+  2) genre_precision &ge; 0.3  <span class="comment"># THRESHOLD_GENRE_PRECISION</span>
+  3) text_coherence &ge; 0.3   <span class="comment"># 의미적 일관성 최소 기준</span>
+  4) 0.15 &le; diversity &le; 0.6  <span class="comment"># 다양성 허용 범위</span>
+</div>
+
+<h3>10.6 저장 및 반영 조건</h3>
+<p>시뮬레이션 결과는 <strong>신뢰도 &ge; 50%</strong> 이고 <strong>정확도 &ge; 50%</strong> 일 때만 "저장 및 반영" 가능. 이 조건을 충족하면 슬라이더에 최적 가중치가 적용되고, 파일로 영속화된다.</p>
+</div>
+
+<!-- 11. 가중치 영속화 -->
+<div class="section" id="persistence">
+<h2>11. 가중치 영속화</h2>
+
+<h3>11.1 개요</h3>
+<p>시뮬레이션 또는 수동으로 설정한 가중치를 JSON 파일(<code>data/saved_weights.json</code>)에 저장하여, 대시보드를 재시작해도 이전 설정이 유지되도록 한다.</p>
+
+<h3>11.2 저장 구조</h3>
+<div class="code-block">{
+  "weights": {
+    "genre": 1.2,
+    "keyword": 0.8,
+    "numeric": 0.7,
+    "text": 1.6
+  },
+  "metadata": {
+    "saved_at": "2026-03-26T14:30:00",
+    "source": "simulation",
+    "confidence": 0.72,
+    "accuracy": 0.75,
+    "composite_score": 0.6234
+  }
+}</div>
+
+<h3>11.3 로드 우선순위</h3>
+<div class="formula-block">
+get_effective_weights():
+  1) data/saved_weights.json 존재 &amp; 유효 &rarr; 저장된 가중치 사용
+  2) 파일 없음 또는 파싱 실패 &rarr; config.py 기본값 사용
+     (WEIGHT_GENRE=1.0, WEIGHT_KEYWORD=1.0, WEIGHT_NUMERIC=0.5, WEIGHT_TEXT=1.5)
+</div>
+
+<h3>11.4 대시보드 연동</h3>
+<table class="table-sm">
+<tr><th>동작</th><th>함수</th><th>효과</th></tr>
+<tr><td>앱 시작</td><td><code>get_effective_weights()</code></td><td>슬라이더 초기값에 저장된 가중치 반영</td></tr>
+<tr><td>저장 및 반영</td><td><code>save_weights()</code></td><td>최적 가중치를 JSON 저장 + 슬라이더 업데이트</td></tr>
+<tr><td>초기화</td><td><code>os.remove()</code></td><td>JSON 파일 삭제 + config.py 기본값 복원</td></tr>
+</table>
+</div>
+
+<!-- 12. 한계 및 개선 방향 -->
 <div class="section" id="limitations">
-<h2>10. 한계 및 개선 방향</h2>
+<h2>12. 한계 및 개선 방향</h2>
 
-<h3>10.1 현재 구현된 것</h3>
+<h3>12.1 현재 구현된 것</h3>
 <table>
 <tr><th>항목</th><th>구현 내용</th><th>상태</th></tr>
 <tr><td>데이터</td><td>KMDB 19,354편, 554 JSON, 장르 정규화(66&rarr;30), 키워드 80개</td><td><span class="badge badge-green">완료</span></td></tr>
@@ -895,12 +1192,14 @@ cos(V<sub>A</sub>, V<sub>B</sub>) = (V<sub>A</sub> . V<sub>B</sub>) / (||V<sub>A
 <tr><td>군집화</td><td>KMeans k=12, GPU, 클러스터 통계</td><td><span class="badge badge-green">완료</span></td></tr>
 <tr><td>차원 축소</td><td>PCA 3D/2D, t-SNE, 축 해석</td><td><span class="badge badge-green">완료</span></td></tr>
 <tr><td>평가</td><td>6개 정량 메트릭, 5개 정성 항목, 적합/부적합</td><td><span class="badge badge-green">완료</span></td></tr>
-<tr><td>민감도</td><td>27조합 분석, Spearman, 겹침률, 순위 변동</td><td><span class="badge badge-green">완료</span></td></tr>
+<tr><td>민감도</td><td>81조합(4파라미터) 분석, 기여도 순위, Spearman, 겹침률</td><td><span class="badge badge-green">완료</span></td></tr>
+<tr><td>최적화</td><td>시뮬레이티드 어닐링, 복합 목적함수, 신뢰도/정확도</td><td><span class="badge badge-green">완료</span></td></tr>
+<tr><td>영속화</td><td>JSON 파일 기반 가중치 저장/로드, 대시보드 재시작 유지</td><td><span class="badge badge-green">완료</span></td></tr>
 <tr><td>시각화</td><td>7종 Plotly HTML (Sankey, 산점도, 히트맵, 평가, 기여도, 민감도)</td><td><span class="badge badge-green">완료</span></td></tr>
 <tr><td>대시보드</td><td>Dash 5탭 (검색, 클러스터, 파라미터, 평가, 민감도)</td><td><span class="badge badge-green">완료</span></td></tr>
 </table>
 
-<h3>10.2 부족한 점 및 개선 방향</h3>
+<h3>12.2 부족한 점 및 개선 방향</h3>
 
 <table>
 <tr><th>분류</th><th>한계</th><th>개선 방향</th><th>난이도</th></tr>
@@ -966,13 +1265,13 @@ cos(V<sub>A</sub>, V<sub>B</sub>) = (V<sub>A</sub> . V<sub>B</sub>) / (||V<sub>A
 </tr>
 <tr>
 <td><strong>민감도</strong></td>
-<td>정성적 비교(장르 분포 변화, 다양성 변화) 부족</td>
-<td>가중치 변경 시 추천 장르/키워드 분포 변화를 시각화</td>
-<td><span class="badge badge-blue">낮음</span></td>
+<td>81조합 전수 탐색이므로 5단계(5<sup>4</sup>=625) 이상으로 세분화 시 시간 급증</td>
+<td>Latin Hypercube Sampling 또는 Sobol Sequence로 효율적 탐색</td>
+<td><span class="badge badge-orange">중간</span></td>
 </tr>
 </table>
 
-<h3>10.3 정리</h3>
+<h3>12.3 정리</h3>
 <div class="highlight">
 <strong>강점</strong>: 4개 그룹을 독립적으로 L2 정규화한 후 가중치로 통합하는 설계는, 이질적인 피처(이산/연속/밀집)를 공정하게 결합하면서도 각 그룹의 영향력을 투명하게 조절할 수 있게 한다. GPU 가속과 캐싱으로 19,000편 규모에서도 실용적인 속도를 유지한다.
 </div>

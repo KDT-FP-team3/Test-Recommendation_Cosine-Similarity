@@ -293,30 +293,55 @@ class MovieSearchEngine:
         return results, "text", parsed
 
     def _search_by_title(self, title, top_k):
-        """제목으로 검색"""
+        """제목으로 검색. 매칭된 원본 영화를 rank 0으로 포함."""
+        mid = None
+
         # 정확 매칭
         if title in self.title_to_id:
             mid = self.title_to_id[title]
-            vec = self.embedding.get_raw_vector(mid)
-            if vec is not None:
-                ranked = self.embedding.compute_similarity_to_train(vec)
-                return self._format_results(ranked, top_k, exclude_id=mid)
 
         # 부분 매칭
-        matches = []
-        query_lower = title.lower()
-        for t, mid in self.title_to_id.items():
-            if query_lower in t.lower():
-                matches.append((t, mid))
+        if mid is None:
+            matches = []
+            query_lower = title.lower()
+            for t, m_id in self.title_to_id.items():
+                if query_lower in t.lower():
+                    matches.append((t, m_id))
+            if len(matches) == 1:
+                mid = matches[0][1]
 
-        if len(matches) == 1:
-            mid = matches[0][1]
-            vec = self.embedding.get_raw_vector(mid)
-            if vec is not None:
-                ranked = self.embedding.compute_similarity_to_train(vec)
-                return self._format_results(ranked, top_k, exclude_id=mid)
+        if mid is None:
+            return None
 
-        return None
+        vec = self.embedding.get_raw_vector(mid)
+        if vec is None:
+            return None
+
+        ranked = self.embedding.compute_similarity_to_train(vec)
+        results = self._format_results(ranked, top_k, exclude_id=mid)
+
+        # 원본 영화를 rank 0으로 맨 앞에 추가
+        source_movie = self.id_to_movie[mid]
+        source_entry = {
+            "rank": 0,
+            "id": mid,
+            "title": source_movie["title"],
+            "title_eng": source_movie.get("title_eng", ""),
+            "year": source_movie["year"],
+            "genres": source_movie.get("genres", []),
+            "similarity": 1.0,
+            "nation": source_movie.get("nation", ""),
+            "directors": source_movie.get("directors", []),
+            "poster_path": source_movie.get("poster_path"),
+            "plot_ko": (source_movie.get("plot_ko", "") or "")[:200],
+            "explanation": "검색된 원본 영화",
+            "is_source": True,
+        }
+
+        # 그룹별 기여도 계산
+        results = self._compute_group_contributions(mid, results)
+
+        return [source_entry] + results
 
     def _search_by_text(self, text, top_k):
         """자유 텍스트 검색"""
@@ -327,11 +352,14 @@ class MovieSearchEngine:
             genres=parsed.get("genres", []),
             keywords=parsed.get("keywords", []),
             numeric_values=parsed.get("numeric_values", {}),
-            text=text,  # 전체 텍스트를 sentence-transformers로 임베딩
+            text=text,
         )
 
         ranked = self.embedding.compute_similarity_to_train(query_vec)
         results = self._format_results(ranked, top_k)
+
+        # 그룹별 기여도 계산
+        results = self._compute_query_group_contributions(parsed, results)
 
         return results, parsed
 
@@ -406,6 +434,51 @@ class MovieSearchEngine:
             "original_text": text,
             "fuzzy_corrections": fuzzy_corrections,
         }
+
+    def _compute_group_contributions(self, source_id, results):
+        """제목 검색 결과에 그룹별 유사도 기여도를 추가한다."""
+        for r in results:
+            if r.get("is_source"):
+                continue
+            group_sim = self.embedding.compute_group_similarity(source_id, r["id"])
+            r["group_similarity"] = group_sim
+        return results
+
+    def _compute_query_group_contributions(self, parsed, results):
+        """텍스트 검색 결과에 쿼리 vs 결과 영화 간 그룹별 유사도를 추가한다."""
+        genres = parsed.get("genres", [])
+        keywords = parsed.get("keywords", [])
+        text = parsed.get("original_text", "")
+
+        genre_vec = np.array(
+            [1.0 if g in genres else 0.0 for g in self.embedding.genres],
+            dtype=np.float32,
+        )
+        keyword_vec = np.array(
+            [1.0 if k in keywords else 0.0 for k in self.embedding.keywords],
+            dtype=np.float32,
+        )
+        text_vec = self.embedding._encode_single_text(text) if text else np.zeros(
+            self.embedding.text_dim, dtype=np.float32
+        )
+
+        def _cos(a, b):
+            na, nb = np.linalg.norm(a), np.linalg.norm(b)
+            if na < 1e-10 or nb < 1e-10:
+                return 0.0
+            return float(np.dot(a, b) / (na * nb))
+
+        for r in results:
+            rec_groups = self.embedding.group_vectors.get(r["id"])
+            if rec_groups:
+                r["group_similarity"] = {
+                    "genre": _cos(genre_vec, rec_groups["genre"]),
+                    "keyword": _cos(keyword_vec, rec_groups["keyword"]),
+                    "text": _cos(text_vec, rec_groups["text"]),
+                    "numeric": 0.0,
+                    "total": r.get("similarity", 0),
+                }
+        return results
 
     def _format_results(self, ranked, top_k, exclude_id=None):
         """순위 결과를 포맷팅한다."""

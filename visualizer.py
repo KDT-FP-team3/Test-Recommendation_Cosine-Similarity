@@ -361,14 +361,14 @@ class MovieVisualizer:
     def generate_sensitivity_html(self, all_results, analysis,
                                    train_movies, test_movies, clusters):
         """
-        27조합 민감도 분석 결과를 standalone HTML로 생성한다.
+        81조합 민감도 분석 결과를 standalone HTML로 생성한다.
 
         Parameters
         ----------
         all_results : dict
             {combo_label: {query_title: [(movie_id, similarity), ...]}}
         analysis : list[dict]
-            각 항목에 combo, wg, wk, wt, query, overlap, spearman_rho,
+            각 항목에 combo, wg, wk, wn, wt, query, overlap, spearman_rho,
             avg_displacement, avg_similarity, genre_precision 포함
         train_movies : list[dict]
         test_movies : list[dict]
@@ -386,14 +386,15 @@ class MovieVisualizer:
                 cluster_map[mid] = int(clusters[i])
 
         # ---------------------------------------------------------------
-        # 27조합별 집계 (테스트 영화 평균)
+        # 81조합별 집계 (테스트 영화 평균)
         # ---------------------------------------------------------------
         combo_agg = {}  # combo_label -> {metrics...}
         for item in analysis:
             label = item["combo"]
             if label not in combo_agg:
                 combo_agg[label] = {
-                    "wg": item["wg"], "wk": item["wk"], "wt": item["wt"],
+                    "wg": item["wg"], "wk": item["wk"],
+                    "wn": item.get("wn", 0.5), "wt": item["wt"],
                     "avg_similarities": [], "genre_precisions": [],
                     "overlaps": [], "spearman_rhos": [],
                     "avg_displacements": [],
@@ -410,7 +411,7 @@ class MovieVisualizer:
             sims = agg["avg_similarities"]
             combo_rows.append({
                 "combo": label,
-                "wg": agg["wg"], "wk": agg["wk"], "wt": agg["wt"],
+                "wg": agg["wg"], "wk": agg["wk"], "wn": agg["wn"], "wt": agg["wt"],
                 "avg_similarity": float(np.mean(sims)) if sims else 0,
                 "genre_precision": float(np.mean(agg["genre_precisions"])) if agg["genre_precisions"] else 0,
                 "overlap": float(np.mean(agg["overlaps"])) if agg["overlaps"] else 0,
@@ -422,7 +423,7 @@ class MovieVisualizer:
         # 유사도 내림차순 정렬
         combo_rows.sort(key=lambda r: r["avg_similarity"], reverse=True)
 
-        baseline_label = "(중,중,중)"
+        baseline_label = "(중,중,중,중)"
 
         # ---------------------------------------------------------------
         # Section 1: Plotly 차트 데이터
@@ -509,13 +510,14 @@ class MovieVisualizer:
             is_baseline = r["combo"] == baseline_label
             row_class = ' class="baseline"' if is_baseline else ""
 
-            combo_colored = f"({_level_span(r['wg'])},{_level_span(r['wk'])},{_level_span(r['wt'])})"
+            combo_colored = f"({_level_span(r['wg'])},{_level_span(r['wk'])},{_level_span(r['wn'])},{_level_span(r['wt'])})"
 
             table_rows_html += f"""<tr{row_class}>
   <td>{idx+1}</td>
   <td class="combo-cell">{combo_colored}</td>
   <td style="background:{_weight_bg(r['wg'])}">{r['wg']:.1f}</td>
   <td style="background:{_weight_bg(r['wk'])}">{r['wk']:.1f}</td>
+  <td style="background:{_weight_bg(r['wn'])}">{r['wn']:.1f}</td>
   <td style="background:{_weight_bg(r['wt'])}">{r['wt']:.1f}</td>
   <td style="background:{_metric_color(r['avg_similarity'], sim_lo, sim_hi)}">{r['avg_similarity']:.4f}</td>
   <td style="background:{_metric_color(r['genre_precision'], gp_lo, gp_hi)}">{r['genre_precision']:.2%}</td>
@@ -663,8 +665,8 @@ h4 {{ margin: 0 0 8px; font-size: 14px; color: #555; text-align: center; }}
 </head>
 <body>
 
-<h1>민감도 분석 (27조합)</h1>
-<p class="subtitle">가중치 조합 순서: (장르, 키워드, 텍스트) &mdash; 각 <span style="background:rgba(41,128,185,0.30);padding:2px 6px;border-radius:3px">상(1.5)</span> / <span style="background:rgba(39,174,96,0.25);padding:2px 6px;border-radius:3px">중(1.0)</span> / <span style="background:rgba(230,126,34,0.30);padding:2px 6px;border-radius:3px">하(0.5)</span> &mdash; 수치 가중치 0.5 고정</p>
+<h1>민감도 분석 (81조합)</h1>
+<p class="subtitle">가중치 조합 순서: (장르, 키워드, 수치, 텍스트) &mdash; 각 <span style="background:rgba(41,128,185,0.30);padding:2px 6px;border-radius:3px">상(1.5)</span> / <span style="background:rgba(39,174,96,0.25);padding:2px 6px;border-radius:3px">중(1.0)</span> / <span style="background:rgba(230,126,34,0.30);padding:2px 6px;border-radius:3px">하(0.5)</span></p>
 
 <!-- Section 1: Charts -->
 <div class="section">
@@ -674,12 +676,12 @@ h4 {{ margin: 0 0 8px; font-size: 14px; color: #555; text-align: center; }}
 
 <!-- Section 2: Detail table -->
 <div class="section">
-<h2>2. 27조합 상세 테이블</h2>
+<h2>2. 81조합 상세 테이블</h2>
 <div style="overflow-x:auto;">
 <table class="detail-table">
 <thead>
 <tr>
-  <th>#</th><th>조합<br><span style="font-weight:normal;font-size:11px">(장르,키워드,텍스트)</span></th><th>장르</th><th>키워드</th><th>텍스트</th>
+  <th>#</th><th>조합<br><span style="font-weight:normal;font-size:11px">(장르,키워드,수치,텍스트)</span></th><th>장르</th><th>키워드</th><th>수치</th><th>텍스트</th>
   <th>유사도</th><th>장르정밀도</th><th>겹침률</th><th>순위상관 &rho;</th>
   <th>순위변동</th><th>신뢰도 &sigma;</th>
 </tr>

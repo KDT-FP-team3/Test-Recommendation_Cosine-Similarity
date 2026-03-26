@@ -160,7 +160,7 @@ def main():
     parser.add_argument("--dashboard", action="store_true",
                         help="대시보드 실행 (http://127.0.0.1:8050)")
     parser.add_argument("--sensitivity", action="store_true",
-                        help="27조합 민감도 분석")
+                        help="81조합 민감도 분석")
     parser.add_argument("--search", action="store_true",
                         help="인터랙티브 검색 모드")
     parser.add_argument("--examples", action="store_true",
@@ -198,7 +198,7 @@ def main():
 
     # 민감도 분석
     if args.sensitivity:
-        print("\n[민감도 분석] 27조합 분석 중...")
+        print("\n[민감도 분석] 81조합 분석 중...")
         print("-" * 72)
         from sensitivity import SensitivityAnalyzer
         analyzer = SensitivityAnalyzer()

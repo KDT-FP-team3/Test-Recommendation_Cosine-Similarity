@@ -7,6 +7,8 @@ main.py는 이 파일의 값을 기본값으로 사용한다.
 """
 
 import os
+import json
+from datetime import datetime
 
 # ===================================================================
 # 경로
@@ -18,6 +20,7 @@ TEXT_EMBED_CACHE = os.path.join(CACHE_DIR, "text_embeddings.npy")
 METADATA_CACHE = os.path.join(CACHE_DIR, "metadata_vectors.npy")
 THUMBNAIL_DIR = os.path.join(CACHE_DIR, "thumbnails")
 RESULTS_DIR = "results"
+SAVED_WEIGHTS_PATH = os.path.join(CACHE_DIR, "saved_weights.json")
 
 # ===================================================================
 # 영화 타입 필터 (이 타입만 포함)
@@ -260,7 +263,7 @@ SENSITIVITY_LEVELS = {
     "상": 1.5,
 }
 SENSITIVITY_SWEEP_VALUES = [0.5, 1.0, 1.5]
-# 3개 가중치(장르, 키워드, 텍스트)로 27조합, 수치는 고정 0.5
+# 4개 가중치(장르, 키워드, 수치, 텍스트)로 81조합
 
 SENSITIVITY_TEXT_QUERIES = [
     "어두운 분위기의 SF 우주 생존 영화",
@@ -269,3 +272,51 @@ SENSITIVITY_TEXT_QUERIES = [
     "역사적 전쟁 드라마 심리극",
     "화려한 블록버스터 판타지 모험 마법",
 ]
+
+
+# ===================================================================
+# 가중치 영속화
+# ===================================================================
+def load_saved_weights():
+    """저장된 가중치를 JSON 파일에서 로드. 없으면 None 반환."""
+    if not os.path.exists(SAVED_WEIGHTS_PATH):
+        return None
+    try:
+        with open(SAVED_WEIGHTS_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        w = data.get("weights", {})
+        if all(k in w for k in ("genre", "keyword", "numeric", "text")):
+            return w
+    except (json.JSONDecodeError, OSError):
+        pass
+    return None
+
+
+def save_weights(weights, source="manual", confidence=0, accuracy=0, score=0):
+    """가중치를 JSON 파일에 저장."""
+    data = {
+        "weights": weights,
+        "metadata": {
+            "saved_at": datetime.now().isoformat(),
+            "source": source,
+            "confidence": confidence,
+            "accuracy": accuracy,
+            "composite_score": score,
+        },
+    }
+    os.makedirs(os.path.dirname(SAVED_WEIGHTS_PATH), exist_ok=True)
+    with open(SAVED_WEIGHTS_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def get_effective_weights():
+    """저장된 가중치가 있으면 사용, 없으면 config 기본값 반환."""
+    saved = load_saved_weights()
+    if saved:
+        return saved
+    return {
+        "genre": WEIGHT_GENRE,
+        "keyword": WEIGHT_KEYWORD,
+        "numeric": WEIGHT_NUMERIC,
+        "text": WEIGHT_TEXT,
+    }

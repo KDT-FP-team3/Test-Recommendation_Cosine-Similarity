@@ -1,14 +1,14 @@
 """
-sensitivity.py -- 파라미터 민감도 분석 모듈 (27조합)
+sensitivity.py -- 파라미터 민감도 분석 모듈 (81조합)
 ====================================================================
-장르/키워드/텍스트 가중치를 상(1.5)/중(1.0)/하(0.5) 3단계로 조합하여
-3^3 = 27가지 경우에 대해 Top-20 추천 목록 변화를 분석.
-수치 가중치는 0.5로 고정.
+장르/키워드/수치/텍스트 가중치를 상(1.5)/중(1.0)/하(0.5) 3단계로 조합하여
+3^4 = 81가지 경우에 대해 Top-20 추천 목록 변화를 분석.
 
-기준선: (중,중,중) = (1.0, 1.0, 1.0)
+기준선: (중,중,중,중) = (1.0, 1.0, 1.0, 1.0)
 """
 
 import itertools
+from collections import defaultdict
 import numpy as np
 import config
 
@@ -35,8 +35,8 @@ def _level_label(val):
     return f"{val:.1f}"
 
 
-def _combo_label(wg, wk, wt):
-    return f"({_level_label(wg)},{_level_label(wk)},{_level_label(wt)})"
+def _combo_label(wg, wk, wn, wt):
+    return f"({_level_label(wg)},{_level_label(wk)},{_level_label(wn)},{_level_label(wt)})"
 
 
 # ===================================================================
@@ -45,8 +45,8 @@ def _combo_label(wg, wk, wt):
 
 class SensitivityAnalyzer:
     """
-    장르/키워드/텍스트 가중치를 상/중/하로 조합한 27가지 경우에 대해
-    기준선(중,중,중) 대비 추천 목록 변화를 분석.
+    장르/키워드/수치/텍스트 가중치를 상/중/하로 조합한 81가지 경우에 대해
+    기준선(중,중,중,중) 대비 추천 목록 변화를 분석.
     """
 
     def __init__(self, top_k=None):
@@ -57,7 +57,7 @@ class SensitivityAnalyzer:
     def analyze_movies(self, embedding, train_movies, test_movies,
                         progress_callback=None):
         """
-        테스트 영화에 대한 27조합 민감도 분석.
+        테스트 영화에 대한 81조합 민감도 분석.
 
         Parameters
         ----------
@@ -69,12 +69,12 @@ class SensitivityAnalyzer:
         all_results : dict
             {combo_label: {query_title: [(movie_id, similarity), ...]}}
         analysis : list[dict]
-            각 항목에 combo, wg, wk, wt, query, overlap, spearman_rho,
+            각 항목에 combo, wg, wk, wn, wt, query, overlap, spearman_rho,
             avg_displacement, avg_similarity, genre_precision 포함
         """
-        combos = list(itertools.product(self.levels, repeat=3))
+        combos = list(itertools.product(self.levels, repeat=4))
         total = len(combos)
-        baseline_wg, baseline_wk, baseline_wt = 1.0, 1.0, 1.0
+        baseline_wg, baseline_wk, baseline_wn, baseline_wt = 1.0, 1.0, 1.0, 1.0
 
         # 테스트 영화의 장르 조회용 매핑
         test_genres = {m["title"]: set(m.get("genres", [])) for m in test_movies}
@@ -83,18 +83,18 @@ class SensitivityAnalyzer:
         # 기준선 결과  -- (id, sim) 튜플 리스트
         baseline_results = self._run_combo(
             embedding, train_movies, test_movies,
-            baseline_wg, baseline_wk, baseline_wt
+            baseline_wg, baseline_wk, baseline_wn, baseline_wt
         )
 
         all_results = {}
         analysis = []
 
-        for idx, (wg, wk, wt) in enumerate(combos):
+        for idx, (wg, wk, wn, wt) in enumerate(combos):
             if progress_callback:
                 progress_callback(idx + 1, total)
-            label = _combo_label(wg, wk, wt)
+            label = _combo_label(wg, wk, wn, wt)
             combo_results = self._run_combo(
-                embedding, train_movies, test_movies, wg, wk, wt
+                embedding, train_movies, test_movies, wg, wk, wn, wt
             )
             all_results[label] = combo_results
 
@@ -146,7 +146,7 @@ class SensitivityAnalyzer:
 
                 analysis.append({
                     "combo": label,
-                    "wg": wg, "wk": wk, "wt": wt,
+                    "wg": wg, "wk": wk, "wn": wn, "wt": wt,
                     "query": query_title,
                     "overlap": round(overlap, 4),
                     "spearman_rho": round(rho, 4),
@@ -159,26 +159,26 @@ class SensitivityAnalyzer:
 
     def analyze_text_queries(self, embedding, train_movies):
         """
-        자유 텍스트 쿼리에 대한 27조합 민감도 분석.
+        자유 텍스트 쿼리에 대한 81조합 민감도 분석.
         """
         if not self.text_queries:
             return {}, []
 
-        combos = list(itertools.product(self.levels, repeat=3))
-        baseline_wg, baseline_wk, baseline_wt = 1.0, 1.0, 1.0
+        combos = list(itertools.product(self.levels, repeat=4))
+        baseline_wg, baseline_wk, baseline_wn, baseline_wt = 1.0, 1.0, 1.0, 1.0
 
         # 기준선
         baseline_results = self._run_text_combo(
-            embedding, train_movies, baseline_wg, baseline_wk, baseline_wt
+            embedding, train_movies, baseline_wg, baseline_wk, baseline_wn, baseline_wt
         )
 
         all_results = {}
         analysis = []
 
-        for wg, wk, wt in combos:
-            label = _combo_label(wg, wk, wt)
+        for wg, wk, wn, wt in combos:
+            label = _combo_label(wg, wk, wn, wt)
             combo_results = self._run_text_combo(
-                embedding, train_movies, wg, wk, wt
+                embedding, train_movies, wg, wk, wn, wt
             )
             all_results[label] = combo_results
 
@@ -204,7 +204,7 @@ class SensitivityAnalyzer:
 
                 analysis.append({
                     "combo": label,
-                    "wg": wg, "wk": wk, "wt": wt,
+                    "wg": wg, "wk": wk, "wn": wn, "wt": wt,
                     "query": query_text[:30],
                     "overlap": round(overlap, 4),
                     "spearman_rho": round(rho, 4),
@@ -213,7 +213,7 @@ class SensitivityAnalyzer:
 
         return all_results, analysis
 
-    def _run_combo(self, embedding, train_movies, test_movies, wg, wk, wt):
+    def _run_combo(self, embedding, train_movies, test_movies, wg, wk, wn, wt):
         """
         특정 가중치 조합으로 추천 실행.
 
@@ -222,7 +222,7 @@ class SensitivityAnalyzer:
         dict : {query_title: [(movie_id, similarity), ...]}
         """
         new_raw = embedding.rebuild_with_weights(
-            w_genre=wg, w_keyword=wk, w_numeric=0.5, w_text=wt
+            w_genre=wg, w_keyword=wk, w_numeric=wn, w_text=wt
         )
 
         # 임시 raw_vectors 교체
@@ -245,10 +245,10 @@ class SensitivityAnalyzer:
         embedding.raw_vectors = old_raw
         return results
 
-    def _run_text_combo(self, embedding, train_movies, wg, wk, wt):
+    def _run_text_combo(self, embedding, train_movies, wg, wk, wn, wt):
         """텍스트 쿼리에 대한 특정 가중치 조합 실행."""
         new_raw = embedding.rebuild_with_weights(
-            w_genre=wg, w_keyword=wk, w_numeric=0.5, w_text=wt
+            w_genre=wg, w_keyword=wk, w_numeric=wn, w_text=wt
         )
 
         old_raw = embedding.raw_vectors
@@ -266,11 +266,73 @@ class SensitivityAnalyzer:
         embedding.raw_vectors = old_raw
         return results
 
+    def compute_contribution_importance(self, analysis):
+        """
+        각 가중치 파라미터의 기여도(중요도)를 계산한다.
+
+        수준별(상/중/하) 평균 유사도의 범위(max - min)로 측정.
+        범위가 클수록 해당 파라미터가 추천 결과에 미치는 영향이 크다.
+
+        Returns
+        -------
+        list[dict] : 중요도 내림차순 정렬.
+            각 dict: label, importance, best_level, best_value, level_means
+        """
+        param_keys = [
+            ("wg", "장르"),
+            ("wk", "키워드"),
+            ("wn", "수치"),
+            ("wt", "텍스트"),
+        ]
+
+        importances = []
+        for param_key, param_label in param_keys:
+            level_sims = defaultdict(list)
+            for item in analysis:
+                level_val = item[param_key]
+                level_sims[level_val].append(item.get("avg_similarity", 0))
+
+            level_means = {
+                lv: float(np.mean(sims)) for lv, sims in level_sims.items()
+            }
+
+            if level_means:
+                vals = list(level_means.values())
+                importance = max(vals) - min(vals)
+                best_level_val = max(level_means, key=level_means.get)
+            else:
+                importance = 0
+                best_level_val = 1.0
+
+            importances.append({
+                "parameter": param_key,
+                "label": param_label,
+                "importance": round(importance, 6),
+                "best_level": _level_label(best_level_val),
+                "best_value": best_level_val,
+                "level_means": {
+                    _level_label(k): round(v, 4) for k, v in level_means.items()
+                },
+            })
+
+        importances.sort(key=lambda x: x["importance"], reverse=True)
+        return importances
+
     def print_analysis(self, analysis):
         """분석 결과를 콘솔에 출력."""
         print("\n" + "=" * 72)
-        print("민감도 분석 결과 (27조합) -- 조합 순서: (장르, 키워드, 텍스트)")
+        print("민감도 분석 결과 (81조합) -- 조합 순서: (장르, 키워드, 수치, 텍스트)")
         print("=" * 72)
+
+        # 기여도 순위
+        importances = self.compute_contribution_importance(analysis)
+        print("\n  [파라미터 기여도 순위]")
+        print(f"  {'순위':<6} {'파라미터':<10} {'중요도':<12} {'최적 수준':<10} {'수준별 평균 유사도'}")
+        print(f"  {'-'*70}")
+        for rank, imp in enumerate(importances, 1):
+            levels_str = ", ".join(f"{k}={v:.4f}" for k, v in imp["level_means"].items())
+            print(f"  {rank:<6} {imp['label']:<10} {imp['importance']:<12.6f} "
+                  f"{imp['best_level']:<10} {levels_str}")
 
         by_query = {}
         for item in analysis:
