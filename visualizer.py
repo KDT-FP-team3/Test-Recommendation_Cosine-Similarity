@@ -30,6 +30,22 @@ _CLUSTER_COLORS = [
     "#673AB7", "#03A9F4", "#F44336", "#4CAF50",
 ]
 
+# 12개 클러스터용 무지개 색상 (최대 구분)
+_RAINBOW_12 = [
+    "#FF0000",  # C0  빨강
+    "#FF7700",  # C1  주황
+    "#FFCC00",  # C2  노랑
+    "#88DD00",  # C3  연두
+    "#00BB00",  # C4  초록
+    "#00CCAA",  # C5  청록
+    "#0099FF",  # C6  하늘
+    "#0044FF",  # C7  파랑
+    "#6600FF",  # C8  남색
+    "#AA00FF",  # C9  보라
+    "#FF00AA",  # C10 분홍
+    "#FF3366",  # C11 진분홍
+]
+
 
 class MovieVisualizer:
     """파이프라인 결과를 HTML 시각화로 변환"""
@@ -172,6 +188,16 @@ class MovieVisualizer:
         clusters = self.result["clusters"]
         cluster_info = self.result.get("cluster_info", {})
 
+        # PCA 분산 비율로 축 라벨 생성
+        reducer = self.result.get("reducer")
+        x_label = "PC1"
+        y_label = "PC2"
+        if reducer is not None:
+            var_ratio = reducer.get_explained_variance()
+            if len(var_ratio) >= 2:
+                x_label = f"PC1 (분산 설명률 {var_ratio[0]:.1%})"
+                y_label = f"PC2 (분산 설명률 {var_ratio[1]:.1%})"
+
         fig = go.Figure()
         unique_clusters = sorted(set(clusters))
         annotations = []
@@ -193,37 +219,35 @@ class MovieVisualizer:
             genre_label = ", ".join(genre_names) if genre_names else "기타"
             cluster_label = f"클러스터 {cluster_id}: {genre_label}"
 
-            # 주요 장르의 대표 색상 (첫 번째 장르 기준)
-            first_genre = genre_names[0] if genre_names else ""
-            genre_color = config.GENRE_COLORS.get(first_genre,
-                          _CLUSTER_COLORS[ci % len(_CLUSTER_COLORS)])
+            # 무지개 색상 (클러스터 인덱스 기반, 최대 구분)
+            rainbow_color = _RAINBOW_12[ci % len(_RAINBOW_12)]
 
             titles = [m["title"] for m in c_movies if m["id"] in coords]
             fig.add_trace(go.Scatter(
                 x=c_coords[:, 0], y=c_coords[:, 1],
-                mode="markers", marker=dict(size=4, color=genre_color, opacity=0.5),
+                mode="markers", marker=dict(size=4, color=rainbow_color, opacity=0.6),
                 name=cluster_label, text=titles, hoverinfo="text",
             ))
 
             # 클러스터 중심에 라벨 표시
             cx, cy = float(np.mean(c_coords[:, 0])), float(np.mean(c_coords[:, 1]))
-            # 배경색: 장르 색상, 텍스트색: 명암 판단
-            r_val = int(genre_color[1:3], 16)
-            g_val = int(genre_color[3:5], 16)
-            b_val = int(genre_color[5:7], 16)
+            # 배경색: 무지개 색상, 텍스트색: 명암 판단
+            r_val = int(rainbow_color[1:3], 16)
+            g_val = int(rainbow_color[3:5], 16)
+            b_val = int(rainbow_color[5:7], 16)
             text_color = "#fff" if (r_val * 0.299 + g_val * 0.587 + b_val * 0.114) < 150 else "#222"
 
             count = cdata.get("count", len(c_movies))
             annotations.append(dict(
                 x=cx, y=cy, text=f"<b>C{cluster_id}</b> {genre_label} ({count}편)",
                 showarrow=False, font=dict(size=11, color=text_color),
-                bgcolor=genre_color, borderpad=4, borderwidth=1,
-                bordercolor=genre_color, opacity=0.9,
+                bgcolor=rainbow_color, borderpad=4, borderwidth=1,
+                bordercolor=rainbow_color, opacity=0.9,
             ))
 
         fig.update_layout(
             title="2D 임베딩 공간 (PCA) -- 클러스터별 주요 장르",
-            xaxis_title="PC1", yaxis_title="PC2",
+            xaxis_title=x_label, yaxis_title=y_label,
             width=config.FIGURE_WIDTH, height=config.FIGURE_HEIGHT,
             annotations=annotations,
         )

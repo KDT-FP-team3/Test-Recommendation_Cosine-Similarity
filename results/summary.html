@@ -51,6 +51,11 @@
   --badge-orange-bg: #fdebd0; --badge-orange-text: #784212;
   --badge-red-bg: #fadbd8; --badge-red-text: #78281f;
   --badge-purple-bg: #e8daef; --badge-purple-text: #512e5f;
+  --badge-yellow-bg: #fef9e7; --badge-yellow-text: #7d6608;
+
+  /* Group colors */
+  --color-genre: #E74C3C; --color-keyword: #3498DB;
+  --color-numeric: #F39C12; --color-text: #27AE60; --color-final: #2C3E50;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -98,6 +103,10 @@
     --badge-orange-bg: #4a3010; --badge-orange-text: #f0c070;
     --badge-red-bg: #4a1818; --badge-red-text: #f0a0a0;
     --badge-purple-bg: #3a1a5a; --badge-purple-text: #c8a0e8;
+    --badge-yellow-bg: #4a3a10; --badge-yellow-text: #f0d060;
+
+    --color-genre: #E74C3C; --color-keyword: #5DADE2;
+    --color-numeric: #F5B041; --color-text: #58D68D; --color-final: #AEB6BF;
   }
 }
 
@@ -132,7 +141,10 @@ tr:hover { background: var(--hover-row); }
 
 /* Code & Formula */
 .code-block { background: var(--bg-code); color: var(--text-code); padding: 18px 22px; border-radius: 8px; font-family: 'Consolas', 'D2Coding', monospace; font-size: 13px; line-height: 1.6; overflow-x: auto; margin: 15px 0; white-space: pre; }
-.formula-block { background: var(--bg-formula); color: var(--text-formula); padding: 18px 22px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.8; margin: 15px 0; border-left: 4px solid #9b59b6; }
+.formula-block { background: var(--bg-formula); color: var(--text-formula); padding: 18px 22px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 14px; line-height: 1.8; margin: 15px 0; border-left: 4px solid #9b59b6; white-space: pre-wrap; overflow-x: auto; }
+.fraction { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; margin: 0 6px; }
+.fraction .numer { padding: 0 8px 4px; border-bottom: 2px solid var(--text-formula); }
+.fraction .denom { padding: 4px 8px 0; }
 .formula-block .comment { color: var(--text-formula-comment); font-size: 12px; }
 code { background: var(--bg-inline-code); padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 13px; color: var(--text-inline-code); }
 
@@ -143,6 +155,28 @@ code { background: var(--bg-inline-code); padding: 2px 6px; border-radius: 3px; 
 .badge-orange { background: var(--badge-orange-bg); color: var(--badge-orange-text); }
 .badge-red { background: var(--badge-red-bg); color: var(--badge-red-text); }
 .badge-purple { background: var(--badge-purple-bg); color: var(--badge-purple-text); }
+.badge-yellow { background: var(--badge-yellow-bg); color: var(--badge-yellow-text); }
+
+/* Tag cloud */
+.tag-cloud { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.tag { display: inline-block; padding: 3px 10px; border-radius: 14px; font-size: 12px; font-weight: 500; border: 1px solid; line-height: 1.6; }
+.tag-genre { background: rgba(231,76,60,.08); border-color: rgba(231,76,60,.3); color: var(--color-genre); }
+.tag-keyword { background: rgba(52,152,219,.08); border-color: rgba(52,152,219,.3); color: var(--color-keyword); }
+.tag-numeric { background: rgba(243,156,18,.08); border-color: rgba(243,156,18,.3); color: var(--color-numeric); }
+.tag-text { background: rgba(39,174,96,.08); border-color: rgba(39,174,96,.3); color: var(--color-text); }
+
+/* Vector bar */
+.vec-bar { display: flex; margin: 15px 0; border-radius: 8px; overflow: hidden; height: 54px; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+.vec-bar .vec-seg { flex-direction: column; line-height: 1.3; }
+.vec-bar .vec-seg small { font-weight: 400; font-size: 10px; opacity: .85; }
+
+/* Pipeline SVG */
+.pipeline-svg { width: 100%; max-width: 1300px; margin: 20px auto; display: block; }
+
+/* Scrollable table */
+.scroll-table { max-height: 320px; overflow-y: auto; border: 1px solid var(--border-card); border-radius: 8px; }
+.scroll-table table { margin: 0; }
+.scroll-table thead th { position: sticky; top: 0; z-index: 1; }
 
 /* Flow diagram */
 .flow { display: flex; flex-direction: column; gap: 0; margin: 20px 0; }
@@ -176,6 +210,8 @@ code { background: var(--bg-inline-code); padding: 2px 6px; border-radius: 3px; 
 /* Grid layout */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; }
+@media (max-width: 900px) { .grid-4 { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
 
 /* Card */
@@ -234,7 +270,7 @@ code { background: var(--bg-inline-code); padding: 2px 6px; border-radius: 3px; 
 <ol>
 <li><a href="#overview">시스템 개요</a></li>
 <li><a href="#principle">추천 원리</a> -- 콘텐츠 기반 필터링, 코사인 유사도의 의미</li>
-<li><a href="#concept">핵심 개념</a> -- 하이브리드 임베딩, L2 정규화, 그룹 가중치</li>
+<li><a href="#concept">핵심 개념</a> -- 하이브리드 임베딩, L2 정규화, 그룹 가중치, 4그룹 상세 (장르/키워드/수치/텍스트 인코딩)</li>
 <li><a href="#flow">처리 흐름</a> -- 6단계 파이프라인 상세</li>
 <li><a href="#formulas">수식 체계</a> -- 벡터 생성, 유사도, 군집화, 차원 축소, 순위 상관</li>
 <li><a href="#formula-relations">수식 항의 관계</a> -- 각 수식이 시스템에서 어떻게 연결되는가</li>
@@ -371,6 +407,221 @@ L2 정규화를 각 그룹에 적용하는 이유도 동일한 맥락이다.
 <td>1.5</td>
 </tr>
 </table>
+
+<h4>파이프라인 다이어그램</h4>
+<svg class="pipeline-svg" viewBox="0 0 1300 520" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="ah" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="var(--text-muted)"/></marker>
+  <filter id="ds"><feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.12"/></filter>
+</defs>
+<rect x="10" y="200" width="170" height="100" rx="12" fill="var(--bg-card)" stroke="var(--border-card)" stroke-width="2" filter="url(#ds)"/>
+<text x="95" y="230" text-anchor="middle" fill="var(--text-primary)" font-size="14" font-weight="bold">KMDB JSON</text>
+<text x="95" y="250" text-anchor="middle" fill="var(--text-faint)" font-size="11">554 파일 / 19,354편</text>
+<text x="95" y="268" text-anchor="middle" fill="var(--text-faint)" font-size="11">(1980~2026)</text>
+<line x1="180" y1="220" x2="260" y2="75" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#ah)"/>
+<line x1="180" y1="240" x2="260" y2="195" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#ah)"/>
+<line x1="180" y1="260" x2="260" y2="315" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#ah)"/>
+<line x1="180" y1="280" x2="260" y2="445" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="265" y="30" width="220" height="90" rx="10" fill="#E74C3C" filter="url(#ds)"/>
+<text x="375" y="55" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">장르 (Genre)</text>
+<text x="375" y="75" text-anchor="middle" fill="#fadbd8" font-size="11">66종 &rarr; 30개 원-핫 &rarr; 30D</text>
+<text x="375" y="93" text-anchor="middle" fill="#fadbd8" font-size="11">W=1.0, 기여 22.2%</text>
+<rect x="265" y="150" width="220" height="90" rx="10" fill="#3498DB" filter="url(#ds)"/>
+<text x="375" y="175" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">키워드 (Keyword)</text>
+<text x="375" y="195" text-anchor="middle" fill="#d6eaf8" font-size="11">상위 80개 바이너리 &rarr; 80D</text>
+<text x="375" y="213" text-anchor="middle" fill="#d6eaf8" font-size="11">W=1.0, 기여 22.2%</text>
+<rect x="265" y="270" width="220" height="90" rx="10" fill="#F39C12" filter="url(#ds)"/>
+<text x="375" y="295" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">수치 (Numeric)</text>
+<text x="375" y="315" text-anchor="middle" fill="#fef9e7" font-size="11">5개 파생 0~1 정규화 &rarr; 5D</text>
+<text x="375" y="333" text-anchor="middle" fill="#fef9e7" font-size="11">W=0.5, 기여 5.6%</text>
+<rect x="265" y="400" width="220" height="90" rx="10" fill="#27AE60" filter="url(#ds)"/>
+<text x="375" y="425" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">텍스트 (Text)</text>
+<text x="375" y="445" text-anchor="middle" fill="#d5f5e3" font-size="11">줄거리 sentence-transformers</text>
+<text x="375" y="463" text-anchor="middle" fill="#d5f5e3" font-size="11">W=1.5, 기여 50.0% &rarr; 384D</text>
+<rect x="540" y="50" width="130" height="40" rx="8" fill="var(--bg-card)" stroke="#E74C3C" stroke-width="2"/>
+<text x="605" y="75" text-anchor="middle" fill="var(--text-primary)" font-size="12" font-weight="600">L2 norm &times;1.0</text>
+<rect x="540" y="170" width="130" height="40" rx="8" fill="var(--bg-card)" stroke="#3498DB" stroke-width="2"/>
+<text x="605" y="195" text-anchor="middle" fill="var(--text-primary)" font-size="12" font-weight="600">L2 norm &times;1.0</text>
+<rect x="540" y="290" width="130" height="40" rx="8" fill="var(--bg-card)" stroke="#F39C12" stroke-width="2"/>
+<text x="605" y="315" text-anchor="middle" fill="var(--text-primary)" font-size="12" font-weight="600">L2 norm &times;0.5</text>
+<rect x="540" y="420" width="130" height="40" rx="8" fill="var(--bg-card)" stroke="#27AE60" stroke-width="2"/>
+<text x="605" y="445" text-anchor="middle" fill="var(--text-primary)" font-size="12" font-weight="600">L2 norm &times;1.5</text>
+<line x1="485" y1="70" x2="535" y2="70" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#ah)"/>
+<line x1="485" y1="190" x2="535" y2="190" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#ah)"/>
+<line x1="485" y1="310" x2="535" y2="310" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#ah)"/>
+<line x1="485" y1="440" x2="535" y2="440" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="730" y="180" width="150" height="160" rx="12" fill="var(--color-final)" filter="url(#ds)"/>
+<text x="805" y="220" text-anchor="middle" fill="#fff" font-size="15" font-weight="bold">Concatenate</text>
+<text x="805" y="245" text-anchor="middle" fill="#bdc3c7" font-size="12">30+80+5+384</text>
+<text x="805" y="268" text-anchor="middle" fill="#fff" font-size="18" font-weight="bold">= 499D</text>
+<text x="805" y="295" text-anchor="middle" fill="#bdc3c7" font-size="11">하이브리드 벡터</text>
+<line x1="670" y1="70" x2="725" y2="210" stroke="#E74C3C" stroke-width="2" marker-end="url(#ah)"/>
+<line x1="670" y1="190" x2="725" y2="240" stroke="#3498DB" stroke-width="2" marker-end="url(#ah)"/>
+<line x1="670" y1="310" x2="725" y2="280" stroke="#F39C12" stroke-width="2" marker-end="url(#ah)"/>
+<line x1="670" y1="440" x2="725" y2="310" stroke="#27AE60" stroke-width="2" marker-end="url(#ah)"/>
+<rect x="940" y="210" width="200" height="100" rx="12" fill="#9B59B6" filter="url(#ds)"/>
+<text x="1040" y="240" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">코사인 유사도</text>
+<text x="1040" y="262" text-anchor="middle" fill="#e8daef" font-size="12">A&middot;B / (||A||&times;||B||)</text>
+<text x="1040" y="282" text-anchor="middle" fill="#e8daef" font-size="12">&rarr; Top-20 추천</text>
+<line x1="880" y1="260" x2="935" y2="260" stroke="var(--text-muted)" stroke-width="2.5" marker-end="url(#ah)"/>
+<rect x="1190" y="225" width="100" height="70" rx="10" fill="var(--bg-card)" stroke="#9B59B6" stroke-width="2" filter="url(#ds)"/>
+<text x="1240" y="255" text-anchor="middle" fill="var(--text-primary)" font-size="13" font-weight="bold">Top-20</text>
+<text x="1240" y="275" text-anchor="middle" fill="var(--text-faint)" font-size="11">추천 목록</text>
+<line x1="1140" y1="260" x2="1185" y2="260" stroke="var(--text-muted)" stroke-width="2" marker-end="url(#ah)"/>
+</svg>
+
+<h4>499D 벡터 구조</h4>
+<div class="vec-bar">
+<div class="vec-seg" style="flex:30;background:var(--color-genre);">장르<small>30D (6.0%)</small></div>
+<div class="vec-seg" style="flex:80;background:var(--color-keyword);">키워드<small>80D (16.0%)</small></div>
+<div class="vec-seg" style="flex:5;background:var(--color-numeric);">수치<small>5D (1.0%)</small></div>
+<div class="vec-seg" style="flex:384;background:var(--color-text);">텍스트 임베딩<small>384D (77.0%)</small></div>
+</div>
+
+<div class="grid-4">
+<div class="card" style="border-left:4px solid var(--color-genre);"><h4 style="color:var(--color-genre);">장르 (30D)</h4><p>KMDB 66종 &rarr; 30개 표준 카테고리 원-핫. W=1.0, 기여 <strong>22.2%</strong></p></div>
+<div class="card" style="border-left:4px solid var(--color-keyword);"><h4 style="color:var(--color-keyword);">키워드 (80D)</h4><p>빈도 &ge;93 상위 80개 바이너리. W=1.0, 기여 <strong>22.2%</strong></p></div>
+<div class="card" style="border-left:4px solid var(--color-numeric);"><h4 style="color:var(--color-numeric);">수치 (5D)</h4><p>러닝타임, 연도, 키워드수, 출연진수, 장르수 파생. W=0.5, 기여 <strong>5.6%</strong></p></div>
+<div class="card" style="border-left:4px solid var(--color-text);"><h4 style="color:var(--color-text);">텍스트 (384D)</h4><p>줄거리 sentence-transformers 임베딩. W=1.5, 기여 <strong>50.0%</strong></p></div>
+</div>
+
+<h4>장르 그룹 (30D) &mdash; 원-핫 인코딩</h4>
+<p>KMDB 66종 원본 장르를 <code>config.py GENRE_MAP</code>으로 30개 표준 카테고리에 매핑 후 원-핫 인코딩. 매핑에 없는 장르는 무시.</p>
+<p><strong>30개 표준 장르:</strong></p>
+<div class="tag-cloud">
+<span class="tag tag-genre">0: 드라마</span><span class="tag tag-genre">1: 액션</span><span class="tag tag-genre">2: 코미디</span><span class="tag tag-genre">3: 스릴러</span><span class="tag tag-genre">4: 범죄</span><span class="tag tag-genre">5: 모험</span><span class="tag tag-genre">6: 로맨스</span><span class="tag tag-genre">7: 판타지</span><span class="tag tag-genre">8: SF</span><span class="tag tag-genre">9: 미스터리</span><span class="tag tag-genre">10: 가족</span><span class="tag tag-genre">11: 공포</span><span class="tag tag-genre">12: 전쟁</span><span class="tag tag-genre">13: 뮤지컬</span><span class="tag tag-genre">14: 사극</span><span class="tag tag-genre">15: 무협</span><span class="tag tag-genre">16: 애니메이션</span><span class="tag tag-genre">17: 스포츠</span><span class="tag tag-genre">18: 다큐멘터리</span><span class="tag tag-genre">19: 인물</span><span class="tag tag-genre">20: 역사</span><span class="tag tag-genre">21: 느와르</span><span class="tag tag-genre">22: 첩보</span><span class="tag tag-genre">23: 서부</span><span class="tag tag-genre">24: 재난</span><span class="tag tag-genre">25: 청춘</span><span class="tag tag-genre">26: 사회</span><span class="tag tag-genre">27: 에로</span><span class="tag tag-genre">28: 종교</span><span class="tag tag-genre">29: 기타</span>
+</div>
+<p><strong>인코딩 예시:</strong></p>
+<div class="formula-block">영화 "범죄도시": 장르 = [액션, 범죄]</div>
+<div style="overflow-x:auto; margin:0 0 15px 0;">
+<table style="border-collapse:collapse; font-family:'Consolas',monospace; font-size:13px; text-align:center; white-space:nowrap;">
+<tr style="font-weight:600; color:var(--text-formula-comment); font-size:11px;">
+<td style="padding:4px 2px; text-align:right; font-family:inherit;">g = [</td>
+<td style="padding:4px 6px;">0</td><td style="padding:4px 6px; background:rgba(231,76,60,0.15); border-radius:4px;"><strong>1</strong></td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px; background:rgba(231,76,60,0.15); border-radius:4px;"><strong>1</strong></td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td>
+<td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td>
+<td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td>
+<td style="padding:4px 2px;">]</td>
+</tr>
+<tr style="font-size:12px; color:var(--text-formula);">
+<td></td>
+<td style="padding:4px 6px;">드라마</td><td style="padding:4px 6px; background:rgba(231,76,60,0.15); border-radius:4px;"><strong>액션</strong></td><td style="padding:4px 6px;">코미디</td><td style="padding:4px 6px;">스릴러</td><td style="padding:4px 6px; background:rgba(231,76,60,0.15); border-radius:4px;"><strong>범죄</strong></td><td style="padding:4px 6px;">모험</td><td style="padding:4px 6px;">로맨스</td><td style="padding:4px 6px;">판타지</td><td style="padding:4px 6px;">SF</td><td style="padding:4px 6px;">미스터리</td>
+<td style="padding:4px 6px;">가족</td><td style="padding:4px 6px;">공포</td><td style="padding:4px 6px;">전쟁</td><td style="padding:4px 6px;">뮤지컬</td><td style="padding:4px 6px;">사극</td><td style="padding:4px 6px;">무협</td><td style="padding:4px 6px;">애니메이션</td><td style="padding:4px 6px;">스포츠</td><td style="padding:4px 6px;">다큐멘터리</td><td style="padding:4px 6px;">인물</td>
+<td style="padding:4px 6px;">역사</td><td style="padding:4px 6px;">느와르</td><td style="padding:4px 6px;">첩보</td><td style="padding:4px 6px;">서부</td><td style="padding:4px 6px;">재난</td><td style="padding:4px 6px;">청춘</td><td style="padding:4px 6px;">사회</td><td style="padding:4px 6px;">에로</td><td style="padding:4px 6px;">종교</td><td style="padding:4px 6px;">기타</td>
+<td></td>
+</tr>
+</table>
+</div>
+
+<p><strong>KMDB 원본 장르 매핑 (66종 &rarr; 30종):</strong></p>
+<div class="grid-2">
+<div class="scroll-table"><table class="table-sm"><thead><tr><th>KMDB 원본</th><th>표준</th></tr></thead><tbody>
+<tr><td>드라마</td><td>드라마</td></tr>
+<tr><td>신파, 문예, 옴니버스, 연쇄극, 옴니버스영화, 동성애</td><td>드라마</td></tr>
+<tr><td>액션, 활극, 해양액션</td><td>액션</td></tr>
+<tr><td>코메디, 코미디</td><td>코미디</td></tr>
+<tr><td>스릴러</td><td>스릴러</td></tr>
+<tr><td>범죄, 갱스터</td><td>범죄</td></tr>
+<tr><td>어드벤처, 모험, 로드무비</td><td>모험</td></tr>
+<tr><td>멜로드라마, 멜로, 로맨스, 애정</td><td>로맨스</td></tr>
+<tr><td>판타지</td><td>판타지</td></tr>
+<tr><td>SF, 과학</td><td>SF</td></tr>
+<tr><td>미스터리</td><td>미스터리</td></tr>
+<tr><td>가족, 아동</td><td>가족</td></tr>
+<tr><td>공포, 공포(호러)</td><td>공포</td></tr>
+<tr><td>전쟁, 군사</td><td>전쟁</td></tr>
+<tr><td>뮤직, 뮤지컬, 오페라</td><td>뮤지컬</td></tr>
+<tr><td>사극, 시대극</td><td>사극</td></tr>
+<tr><td>무협</td><td>무협</td></tr>
+</tbody></table></div>
+<div class="scroll-table"><table class="table-sm"><thead><tr><th>KMDB 원본</th><th>표준</th></tr></thead><tbody>
+<tr><td>애니메이션, 애니매에이션, 기독교 애니메이션</td><td>애니메이션</td></tr>
+<tr><td>스포츠</td><td>스포츠</td></tr>
+<tr><td>다큐멘터리, 기록, 자연&middot;환경</td><td>다큐멘터리</td></tr>
+<tr><td>인물, 전기</td><td>인물</td></tr>
+<tr><td>역사</td><td>역사</td></tr>
+<tr><td>느와르</td><td>느와르</td></tr>
+<tr><td>첩보</td><td>첩보</td></tr>
+<tr><td>서부</td><td>서부</td></tr>
+<tr><td>재난</td><td>재난</td></tr>
+<tr><td>청춘영화, 하이틴(고교)</td><td>청춘</td></tr>
+<tr><td>사회, 사회물(경향), 분단, 인권</td><td>사회</td></tr>
+<tr><td>에로</td><td>에로</td></tr>
+<tr><td>종교</td><td>종교</td></tr>
+<tr><td>문화, 반공, 지역, 실험, 교육, 계몽, 예술, 기업&middot;기관&middot;단체, 합작(번안물)</td><td>기타</td></tr>
+</tbody></table></div>
+</div>
+
+<h4>키워드 그룹 (80D) &mdash; 바이너리 인코딩</h4>
+<p>KMDB 키워드 필드에서 빈도 &ge;93인 <strong>상위 80개</strong>를 선정. 해당 키워드가 있으면 1, 없으면 0.</p>
+<p><strong>80개 키워드:</strong></p>
+<div class="tag-cloud">
+<span class="tag tag-keyword">0: 복수</span><span class="tag tag-keyword">1: 로맨스</span><span class="tag tag-keyword">2: 소설원작</span><span class="tag tag-keyword">3: 시리즈</span><span class="tag tag-keyword">4: 살인</span><span class="tag tag-keyword">5: 경찰</span><span class="tag tag-keyword">6: 가족</span><span class="tag tag-keyword">7: 납치</span><span class="tag tag-keyword">8: 마약</span><span class="tag tag-keyword">9: 불륜</span><span class="tag tag-keyword">10: 결혼</span><span class="tag tag-keyword">11: 음모</span><span class="tag tag-keyword">12: 사랑</span><span class="tag tag-keyword">13: 우정</span><span class="tag tag-keyword">14: 추적</span><span class="tag tag-keyword">15: 연쇄살인</span><span class="tag tag-keyword">16: 여행</span><span class="tag tag-keyword">17: 형사</span><span class="tag tag-keyword">18: 리메이크</span><span class="tag tag-keyword">19: 삼각관계</span><span class="tag tag-keyword">20: 자살</span><span class="tag tag-keyword">21: 첫사랑</span><span class="tag tag-keyword">22: 임신</span><span class="tag tag-keyword">23: 교도소</span><span class="tag tag-keyword">24: 배신</span><span class="tag tag-keyword">25: 탈출</span><span class="tag tag-keyword">26: 킬러</span><span class="tag tag-keyword">27: 실존인물</span><span class="tag tag-keyword">28: 외계인</span><span class="tag tag-keyword">29: 변호사</span><span class="tag tag-keyword">30: 실종</span><span class="tag tag-keyword">31: 고등학생</span><span class="tag tag-keyword">32: 형제</span><span class="tag tag-keyword">33: 마피아</span><span class="tag tag-keyword">34: 블랙코미디</span><span class="tag tag-keyword">35: 역사</span><span class="tag tag-keyword">36: FBI</span><span class="tag tag-keyword">37: 테러</span><span class="tag tag-keyword">38: 전쟁</span><span class="tag tag-keyword">39: 인질</span><span class="tag tag-keyword">40: 학교</span><span class="tag tag-keyword">41: 죽음</span><span class="tag tag-keyword">42: 시간여행</span><span class="tag tag-keyword">43: 이혼</span><span class="tag tag-keyword">44: 부부</span><span class="tag tag-keyword">45: 동거</span><span class="tag tag-keyword">46: 친구</span><span class="tag tag-keyword">47: 소녀</span><span class="tag tag-keyword">48: 작가</span><span class="tag tag-keyword">49: 기억상실</span><span class="tag tag-keyword">50: 범죄조직</span><span class="tag tag-keyword">51: 유령</span><span class="tag tag-keyword">52: 고아</span><span class="tag tag-keyword">53: 마법</span><span class="tag tag-keyword">54: 모험</span><span class="tag tag-keyword">55: 파리</span><span class="tag tag-keyword">56: 소년</span><span class="tag tag-keyword">57: 우주</span><span class="tag tag-keyword">58: 로봇</span><span class="tag tag-keyword">59: 누명</span><span class="tag tag-keyword">60: 실화바탕</span><span class="tag tag-keyword">61: 속편</span><span class="tag tag-keyword">62: 만화원작</span><span class="tag tag-keyword">63: 재개봉</span><span class="tag tag-keyword">64: 교통사고</span><span class="tag tag-keyword">65: 섹스</span><span class="tag tag-keyword">66: 짝사랑</span><span class="tag tag-keyword">67: 살인사건</span><span class="tag tag-keyword">68: 제2차세계대전</span><span class="tag tag-keyword">69: 암살</span><span class="tag tag-keyword">70: 뉴욕</span><span class="tag tag-keyword">71: 홍콩</span><span class="tag tag-keyword">72: 인디영화</span><span class="tag tag-keyword">73: 독립영화</span><span class="tag tag-keyword">74: 기차</span><span class="tag tag-keyword">75: 질투</span><span class="tag tag-keyword">76: 대학생</span><span class="tag tag-keyword">77: 옴니버스영화</span><span class="tag tag-keyword">78: 외도</span><span class="tag tag-keyword">79: 왕따</span>
+</div>
+<p><strong>인코딩 예시:</strong></p>
+<div class="formula-block">영화 키워드: "복수|마약|추적|경찰"</div>
+<div style="overflow-x:auto; margin:0 0 8px 0;">
+<table style="border-collapse:collapse; font-family:'Consolas',monospace; font-size:13px; text-align:center; white-space:nowrap;">
+<tr style="font-weight:600; color:var(--text-formula-comment); font-size:11px;">
+<td style="padding:4px 2px; text-align:right;">k = [</td>
+<td style="padding:4px 6px; background:rgba(52,152,219,0.15); border-radius:4px;"><strong>1</strong></td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px; background:rgba(52,152,219,0.15); border-radius:4px;"><strong>1</strong></td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px; background:rgba(52,152,219,0.15); border-radius:4px;"><strong>1</strong></td><td style="padding:4px 6px;">0</td>
+<td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px;">0</td><td style="padding:4px 6px; background:rgba(52,152,219,0.15); border-radius:4px;"><strong>1</strong></td><td style="padding:4px 6px;">0</td>
+<td style="padding:4px 6px; color:var(--text-formula-comment);">...</td>
+<td style="padding:4px 2px;">]</td>
+<td style="padding:4px 8px; color:var(--text-formula-comment); font-size:11px;">(80D)</td>
+</tr>
+<tr style="font-size:12px; color:var(--text-formula);">
+<td></td>
+<td style="padding:4px 6px; background:rgba(52,152,219,0.15); border-radius:4px;"><strong>복수</strong></td><td style="padding:4px 6px;">로맨스</td><td style="padding:4px 6px;">소설원작</td><td style="padding:4px 6px;">시리즈</td><td style="padding:4px 6px;">살인</td><td style="padding:4px 6px; background:rgba(52,152,219,0.15); border-radius:4px;"><strong>경찰</strong></td><td style="padding:4px 6px;">가족</td><td style="padding:4px 6px;">납치</td><td style="padding:4px 6px; background:rgba(52,152,219,0.15); border-radius:4px;"><strong>마약</strong></td><td style="padding:4px 6px;">불륜</td>
+<td style="padding:4px 6px;">결혼</td><td style="padding:4px 6px;">음모</td><td style="padding:4px 6px;">사랑</td><td style="padding:4px 6px;">우정</td><td style="padding:4px 6px; background:rgba(52,152,219,0.15); border-radius:4px;"><strong>추적</strong></td><td style="padding:4px 6px;">연쇄살인</td>
+<td style="padding:4px 6px;"></td>
+<td></td>
+<td></td>
+</tr>
+</table>
+</div>
+<div class="formula-block"><span class="comment"># ALL_KEYWORDS 80개 목록에 포함되면 1, 아니면 0</span></div>
+
+<h4>수치 그룹 (5D) &mdash; 파생 수치 (0~1 정규화)</h4>
+<table>
+<tr><th>차원</th><th>피처명</th><th>원본 데이터</th><th>계산식</th><th>결측치</th></tr>
+<tr><td><span class="badge badge-yellow">D0</span></td><td><code>runtime_norm</code></td><td>러닝타임(분)</td><td><code>clamp((runtime-30)/(240-30), 0, 1)</code></td><td>0 or None &rarr; 0.5</td></tr>
+<tr><td><span class="badge badge-yellow">D1</span></td><td><code>year_norm</code></td><td>제작연도</td><td><code>clamp((year-1980)/(2026-1980), 0, 1)</code></td><td>기본 2000</td></tr>
+<tr><td><span class="badge badge-yellow">D2</span></td><td><code>keyword_richness</code></td><td>매칭 키워드 수</td><td><code>min(count/10, 1.0)</code></td><td>0</td></tr>
+<tr><td><span class="badge badge-yellow">D3</span></td><td><code>cast_size_norm</code></td><td>출연진 수</td><td><code>min(count/20, 1.0)</code></td><td>0</td></tr>
+<tr><td><span class="badge badge-yellow">D4</span></td><td><code>genre_count_norm</code></td><td>장르 수</td><td><code>min(count/5, 1.0)</code></td><td>0</td></tr>
+</table>
+<p><strong>인코딩 예시:</strong></p>
+<div class="formula-block">영화: 러닝타임=120분, 연도=2023, 키워드 5개, 출연진 12명, 장르 3개</div>
+<div style="overflow-x:auto; margin:0 0 15px 0;">
+<table style="border-collapse:collapse; font-family:'Consolas',monospace; font-size:13px; text-align:center; white-space:nowrap;">
+<tr style="font-weight:600;">
+<td style="padding:4px 2px; text-align:right; color:var(--text-formula);">n = [</td>
+<td style="padding:4px 12px; color:var(--text-formula);">0.43</td><td style="padding:4px 12px; color:var(--text-formula);">0.93</td><td style="padding:4px 12px; color:var(--text-formula);">0.50</td><td style="padding:4px 12px; color:var(--text-formula);">0.60</td><td style="padding:4px 12px; color:var(--text-formula);">0.60</td>
+<td style="padding:4px 2px; color:var(--text-formula);">]</td>
+</tr>
+<tr style="font-size:12px; color:var(--text-formula-comment);">
+<td></td>
+<td style="padding:2px 12px; border-top:2px solid var(--text-formula-comment);">런타임</td><td style="padding:2px 12px; border-top:2px solid var(--text-formula-comment);">연도</td><td style="padding:2px 12px; border-top:2px solid var(--text-formula-comment);">키워드</td><td style="padding:2px 12px; border-top:2px solid var(--text-formula-comment);">출연진</td><td style="padding:2px 12px; border-top:2px solid var(--text-formula-comment);">장르수</td>
+<td></td>
+</tr>
+</table>
+</div>
+
+<h4>텍스트 그룹 (384D) &mdash; 줄거리 임베딩</h4>
+<div class="formula-block">"어두운 분위기의 우주 생존 SF 영화. 우주비행사가 홀로 살아남기 위해..."
+
+  &darr; sentence-transformers encode (max 512자)
+
+t = [0.0234, -0.0891, 0.1456, ..., -0.0312, 0.0678]   <span class="comment">(384D 실수 벡터)</span>
+
+<span class="comment"># 인코더 모델: 텍스트 &rarr; 고정 차원 벡터 변환만 수행 (생성형 LLM이 아님)</span>
+<span class="comment"># 비슷한 줄거리 &rarr; 높은 코사인 유사도</span></div>
+
+<div class="highlight">
+<strong>인코더 모델 vs 생성형 LLM:</strong>
+sentence-transformers는 텍스트를 고정 차원 벡터로 변환하는 <strong>인코더</strong>이다.
+추천 로직에 LLM은 전혀 사용되지 않으며, 오직 코사인 유사도만으로 추천 순위를 결정한다.
+</div>
 
 <h3>3.2 L2 정규화 (그룹별)</h3>
 <p><strong>문제</strong>: 텍스트 그룹(384D)이 장르(30D)보다 12.8배 더 많은 차원을 차지하므로, 단순 연결하면 텍스트가 유사도를 지배한다.</p>
@@ -542,16 +793,21 @@ X_scaled<sub>ij</sub> = (X<sub>ij</sub> - mu<sub>j</sub>) / sigma<sub>j</sub>   
 </div>
 
 <h3>5.3 코사인 유사도</h3>
+
+<h4>기본 수식</h4>
 <div class="formula-block">
-cos(A, B) = (A . B) / (||A|| x ||B||)
+cos(A, B) = (A &middot; B) / (||A|| &times; ||B||)
 
 <span class="comment"># 내적 전개:</span>
-A . B = SUM(A<sub>i</sub> x B<sub>i</sub>)  for i = 1..499
+A &middot; B = SUM(A<sub>i</sub> &times; B<sub>i</sub>)  for i = 1..499
 
 <span class="comment"># GPU 배치 연산 (M개 쿼리, N개 학습):</span>
 Q_n = Q / ||Q||   <span class="comment">(행별 L2 정규화, M x 499)</span>
 T_n = T / ||T||   <span class="comment">(행별 L2 정규화, N x 499)</span>
-S = Q_n x T_n<sup>T</sup>     <span class="comment">(행렬곱, M x N 유사도 행렬)</span>
+S = Q_n &times; T_n<sup>T</sup>     <span class="comment">(행렬곱, M x N 유사도 행렬)</span>
+
+<span class="comment"># 정규화된 벡터의 내적 = 코사인 유사도:</span>
+<span class="comment">#   (A / ||A||) &middot; (B / ||B||) = A &middot; B / (||A|| &times; ||B||)</span>
 </div>
 
 <h4>그룹별 유사도 분해</h4>
@@ -565,6 +821,44 @@ sim_total(A, B)   = cos(V<sub>A</sub>, V<sub>B</sub>)       <span class="comment
 
 <span class="comment"># 주의: sim_total != sim_genre + sim_keyword + sim_numeric + sim_text</span>
 <span class="comment"># 전체 유사도는 가중 연결된 벡터의 코사인으로, 단순 합이 아님</span>
+</div>
+
+<h4>전체 유사도의 그룹별 전개 (핵심 수식)</h4>
+
+<p>499D 벡터 V 는 L2 정규화된 4개 그룹에 가중치를 곱한 연결이다:</p>
+<div class="formula-block">
+V<sub>A</sub> = [ (g<sub>A</sub>/||g<sub>A</sub>||)&times;W<sub>g</sub> | (k<sub>A</sub>/||k<sub>A</sub>||)&times;W<sub>k</sub> | (n<sub>A</sub>/||n<sub>A</sub>||)&times;W<sub>n</sub> | (t<sub>A</sub>/||t<sub>A</sub>||)&times;W<sub>t</sub> ]
+</div>
+
+<p>내적 V<sub>A</sub> &middot; V<sub>B</sub> 를 그룹별로 전개하면:</p>
+<div class="formula-block">
+V<sub>A</sub> &middot; V<sub>B</sub> = W<sub>g</sub><sup>2</sup> &times; cos<sub>genre</sub>(A,B)
+           + W<sub>k</sub><sup>2</sup> &times; cos<sub>keyword</sub>(A,B)
+           + W<sub>n</sub><sup>2</sup> &times; cos<sub>numeric</sub>(A,B)
+           + W<sub>t</sub><sup>2</sup> &times; cos<sub>text</sub>(A,B)
+
+<span class="comment"># 각 그룹이 L2 정규화되어 노름=1이므로:</span>
+||V||<sup>2</sup> = W<sub>g</sub><sup>2</sup> + W<sub>k</sub><sup>2</sup> + W<sub>n</sub><sup>2</sup> + W<sub>t</sub><sup>2</sup>
+</div>
+
+<p>따라서 최종 코사인 유사도는 <strong>가중치 제곱(W&sup2;)을 비율로 한 그룹별 코사인 유사도의 가중 평균</strong>이 된다:</p>
+<div class="formula-block" style="white-space:normal; text-align:center; font-size:15px; padding:24px 22px;">
+cos(A, B) = <span class="fraction"><span class="numer">W<sub>g</sub><sup>2</sup> &times; cos<sub>g</sub> + W<sub>k</sub><sup>2</sup> &times; cos<sub>k</sub> + W<sub>n</sub><sup>2</sup> &times; cos<sub>n</sub> + W<sub>t</sub><sup>2</sup> &times; cos<sub>t</sub></span><span class="denom">W<sub>g</sub><sup>2</sup> + W<sub>k</sub><sup>2</sup> + W<sub>n</sub><sup>2</sup> + W<sub>t</sub><sup>2</sup></span></span>
+</div>
+
+<h4>기본 가중치에서의 실제 기여 비율</h4>
+<table>
+<tr><th>그룹</th><th>W</th><th>W&sup2;</th><th>기여 비율</th><th>의미</th></tr>
+<tr><td>장르</td><td>1.0</td><td>1.00</td><td><strong>22.2%</strong></td><td>30D 원-핫 인코딩</td></tr>
+<tr><td>키워드</td><td>1.0</td><td>1.00</td><td><strong>22.2%</strong></td><td>80D 바이너리 인코딩</td></tr>
+<tr><td>수치</td><td>0.5</td><td>0.25</td><td><strong>5.6%</strong></td><td>5D 파생 수치</td></tr>
+<tr><td>텍스트</td><td>1.5</td><td>2.25</td><td><strong>50.0%</strong></td><td>384D 줄거리 임베딩</td></tr>
+<tr style="font-weight:bold"><td>합계</td><td>--</td><td>4.50</td><td>100%</td><td></td></tr>
+</table>
+
+<div class="highlight">
+<strong>핵심 해석:</strong> 텍스트(줄거리) 유사도가 전체의 절반(50%)을 차지하고, 장르와 키워드가 각 22%씩, 수치 특성이 약 6%를 차지한다.
+가중치 W를 변경하면 W&sup2; 비율이 바뀌어 각 그룹의 기여 비율이 달라진다.
 </div>
 
 <h3>5.4 KMeans 군집화</h3>
@@ -808,50 +1102,180 @@ cos(V<sub>A</sub>, V<sub>B</sub>) = (V<sub>A</sub> . V<sub>B</sub>) / (||V<sub>A
 
 <h3>7.5 검색 엔진 (search.py)</h3>
 
-<p>사용자 자유 텍스트 입력에서 장르/키워드를 자동 추출하여 쿼리 벡터를 구성하는 <strong>4단계 파싱</strong> 엔진.</p>
+<p>사용자 자유 텍스트 입력에서 장르/키워드를 자동 추출하여 쿼리 벡터를 구성하는 <strong>4단계 파싱</strong> 엔진.
+띄어쓰기 오류, 오타, 영어&harr;한글 혼용을 모두 처리하여 검색 품질을 보장한다.</p>
 
-<h4>4단계 쿼리 파싱</h4>
+<h4>4단계 쿼리 파싱 파이프라인</h4>
 <table class="table-sm">
-<tr><th>단계</th><th>방식</th><th>사전 크기</th><th>예시</th></tr>
-<tr><td>1. 정확 매칭</td><td>장르/키워드 별칭 사전에서 단어 단위 매칭</td><td>장르 100+, 키워드 70+</td><td>"코메디" → 코미디, "sf" → SF</td></tr>
-<tr><td>2. 부분 매칭</td><td>복합어 내 부분 문자열 매칭</td><td>동일 사전</td><td>"공상과학영화" → SF</td></tr>
-<tr><td>3. 정규화</td><td>공백 제거, 오타 치환표 적용 후 재매칭</td><td>치환 규칙</td><td>"멜 로" → 로맨스</td></tr>
-<tr><td>4. 퍼지 매칭</td><td>한글 자모 분해 + 레벤슈타인 편집 거리</td><td>동적 계산</td><td>"액숀" → 액션 (거리 1)</td></tr>
+<tr><th>단계</th><th>방식</th><th>대응하는 문제</th><th>예시</th></tr>
+<tr><td><span class="badge badge-blue">1단계</span> 정확 매칭</td><td>별칭 사전 직접 조회 (단어 단위)</td><td>영어&rarr;한글, 유의어</td><td>"action" &rarr; 액션, "코메디" &rarr; 코미디</td></tr>
+<tr><td><span class="badge badge-green">2단계</span> 부분 매칭</td><td>입력 텍스트에 별칭이 부분 문자열로 포함되는지 검사</td><td>복합어, 조사 포함</td><td>"로맨틱코미디영화" 안에 "코미디" &rarr; 코미디</td></tr>
+<tr><td><span class="badge badge-orange">3단계</span> 정규화 매칭</td><td>공백 제거 + 오타 치환표 적용 후 재매칭</td><td>띄어쓰기 오류, 흔한 오타</td><td>"어드벤 쳐 영화" &rarr; "어드벤처영화" &rarr; 모험</td></tr>
+<tr><td><span class="badge badge-purple">4단계</span> 퍼지 매칭</td><td>한글 자모 분해 + Levenshtein 편집 거리</td><td>심한 오타, 발음 변형</td><td>"액숀" &rarr; 액션 (자모 편집 거리 2)</td></tr>
 </table>
 
-<h4>퍼지 매칭 상세</h4>
-<div class="formula-block">
-한글 자모 분해 (Jamo Decomposition):
-  "액" → (ㅇ, ㅐ, ㄱ),  "션" → (ㅅ, ㅕ, ㄴ)  <span class="comment"># 초성/중성/종성 분리</span>
+<h4>1단계: 정확 매칭 -- 별칭 사전 직접 조회</h4>
+<p>단어 단위로 분리한 뒤, GENRE_ALIASES / KEYWORD_ALIASES 사전에서 직접 조회한다.
+영어와 한글 모두 동일 사전에 등록되어 있어 <strong>영어를 한글처럼, 한글을 영어처럼 표기</strong>해도 매칭된다.</p>
+<div class="code-block"><span style="color:#6c7086"># search.py:384-391</span>
+<span style="color:#89b4fa">for</span> word <span style="color:#89b4fa">in</span> words:
+    word_clean = word.strip(<span style="color:#f9e2af">",.!?()[]\"'"</span>)
+    <span style="color:#89b4fa">if</span> word_clean <span style="color:#89b4fa">in</span> GENRE_ALIASES:       <span style="color:#6c7086"># "action" &rarr; "액션"</span>
+        genres.add(GENRE_ALIASES[word_clean])
+    <span style="color:#89b4fa">if</span> word_clean <span style="color:#89b4fa">in</span> KEYWORD_ALIASES:     <span style="color:#6c7086"># "revenge" &rarr; "복수"</span>
+        keywords.add(KEYWORD_ALIASES[word_clean])</div>
 
-편집 거리 (Levenshtein Distance):
-  d("액숀", "액션") = 1                          <span class="comment"># DP 기반, 자모 단위 비교</span>
-
-음절 수별 허용 임계값:
-  1음절: 매칭 안 함  <span class="comment"># 오탐 방지 (예: "사"→"SF" 방지)</span>
-  2음절: ≤ 1         <span class="comment"># 최소 변동만 허용</span>
-  3음절+: ≤ 3        <span class="comment"># 오타/방언/변형 허용</span>
-</div>
-
-<h4>별칭 사전 구조</h4>
 <div class="grid-2">
 <div class="card">
-<h4>장르 별칭 (100+ 매핑)</h4>
-<p>한국어 + 영어 지원<br>
-"코메디" → 코미디<br>
-"thriller", "스릴러물" → 스릴러<br>
-"사이파이", "공상과학" → SF<br>
-"멜로", "연애" → 로맨스</p>
+<h4>장르 별칭 사전 (100+ 매핑)</h4>
+<p>한국어 + 영어 동시 지원<br>
+"코메디" &rarr; 코미디<br>
+"thriller", "서스펜스" &rarr; 스릴러<br>
+"sf", "사이파이", "공상과학", "sci-fi" &rarr; SF<br>
+"멜로", "romance", "사랑" &rarr; 로맨스</p>
 </div>
 <div class="card">
-<h4>키워드 별칭 (70+ 매핑)</h4>
+<h4>키워드 별칭 사전 (70+ 매핑)</h4>
 <p>유의어/영어 매핑<br>
-"살인", "murder" → 살인<br>
-"마약", "drugs" → 마약<br>
-"고등학교", "학교" → 학교<br>
-"외계인", "alien" → 외계인</p>
+"murder" &rarr; 살인, "drugs" &rarr; 마약<br>
+"alien" &rarr; 외계인, "ghost" &rarr; 유령<br>
+"serial killer" &rarr; 연쇄살인<br>
+"time travel" &rarr; 시간여행</p>
 </div>
 </div>
+
+<h4>2단계: 부분 문자열 매칭 -- 복합어 대응</h4>
+<p>입력 텍스트 전체에서 별칭 키가 부분 문자열로 포함되는지 검사한다.
+"공상과학영화", "로맨틱코미디물" 등 복합어에서도 장르/키워드를 추출할 수 있다.</p>
+<div class="code-block"><span style="color:#6c7086"># search.py:393-399</span>
+<span style="color:#89b4fa">for</span> alias, genre <span style="color:#89b4fa">in</span> GENRE_ALIASES.items():
+    <span style="color:#89b4fa">if</span> alias <span style="color:#89b4fa">in</span> text_lower:    <span style="color:#6c7086"># 부분 문자열 포함 여부 검사</span>
+        genres.add(genre)</div>
+
+<h4>3단계: 정규화 매칭 -- 띄어쓰기 + 오타 치환</h4>
+<p>입력 텍스트와 별칭 사전 양쪽 모두를 정규화(공백 제거 + 오타 치환)한 뒤 비교한다.</p>
+
+<div class="formula-block">
+정규화 함수 _normalize_korean(text):
+  (1) 공백 제거 + 소문자 변환:  "어드벤 쳐 영화" &rarr; "어드벤쳐영화"
+  (2) 오타 치환 규칙 적용:      "어드벤쳐영화"   &rarr; "어드벤처영화"
+  (3) 정규화된 별칭과 비교:      "어드벤처" in "어드벤처영화" = True &rarr; 장르: 모험
+</div>
+
+<p>오타 치환 규칙 (<code>_TYPO_SUBS</code>, 12개 규칙):</p>
+<table class="table-sm">
+<tr><th>오타 입력</th><th>치환 결과</th><th>오타 입력</th><th>치환 결과</th></tr>
+<tr><td>액숀</td><td>&rarr; 액션</td><td>에니메, 에니</td><td>&rarr; 애니메, 애니</td></tr>
+<tr><td>코메디</td><td>&rarr; 코미디</td><td>쓰릴러</td><td>&rarr; 스릴러</td></tr>
+<tr><td>호로</td><td>&rarr; 호러</td><td>어드벤쳐</td><td>&rarr; 어드벤처</td></tr>
+<tr><td>판타지아</td><td>&rarr; 판타지</td><td>다큐맨터리</td><td>&rarr; 다큐멘터리</td></tr>
+<tr><td>멜로드라마</td><td>&rarr; 멜로</td><td>로맨틱</td><td>&rarr; 로맨스</td></tr>
+<tr><td>뮤지컬영화</td><td>&rarr; 뮤지컬</td><td>다큐맨</td><td>&rarr; 다큐멘</td></tr>
+</table>
+
+<h4>4단계: 자모 퍼지 매칭 -- 편집 거리 기반</h4>
+<p>1~3단계에서 매칭되지 않은 단어만 대상으로, <strong>한글 자모(초성/중성/종성) 분해 후 Levenshtein 편집 거리</strong>를 계산한다.</p>
+
+<h4>4-1. 한글 음절 &rarr; 자모 분해</h4>
+<p>유니코드 한글 음절(U+AC00~U+D7A3)을 초성/중성/종성 인덱스로 분해한다:</p>
+<div class="formula-block" style="white-space:normal;">
+<table style="border-collapse:collapse; font-family:'Consolas','D2Coding',monospace; font-size:14px; line-height:1.8;">
+<tr><td style="text-align:right; padding-right:6px;">offset</td><td style="padding:0 6px;">=</td><td>code(음절) - 0xAC00</td></tr>
+<tr><td colspan="3" style="padding:4px 0;"></td></tr>
+<tr><td style="text-align:right; padding-right:6px;">종성</td><td style="padding:0 6px;">=</td><td>offset mod 28</td></tr>
+<tr><td style="text-align:right; padding-right:6px;">중성</td><td style="padding:0 6px;">=</td><td>&lfloor;offset / 28&rfloor; mod 21</td></tr>
+<tr><td style="text-align:right; padding-right:6px;">초성</td><td style="padding:0 6px;">=</td><td>&lfloor;offset / (28 &times; 21)&rfloor;</td></tr>
+</table>
+<br><span class="comment"># 예시: "공" (U+ACF5)</span>
+<span class="comment">#   offset = 0xACF5 - 0xAC00 = 245</span>
+<span class="comment">#   종성 = 245 mod 28 = 21 (ㅇ)</span>
+<span class="comment">#   중성 = (245 / 28) mod 21 = 8 (ㅗ)</span>
+<span class="comment">#   초성 = 245 / 588 = 0 (ㄱ)</span>
+<span class="comment">#   자모 시퀀스: [0, 8, 21]</span>
+
+<span class="comment"># "액" &rarr; [11, 1, 0]  "숀" &rarr; [9, 8, 21]</span>
+<span class="comment"># "액" &rarr; [11, 1, 0]  "션" &rarr; [9, 7, 21]</span>
+</div>
+
+<h4>4-2. Levenshtein 편집 거리 (DP)</h4>
+<p>두 자모 시퀀스 S<sub>A</sub>, S<sub>B</sub> 간의 편집 거리를 동적 프로그래밍(DP)으로 계산한다:</p>
+<div class="formula-block" style="white-space:normal;">
+<table style="border-collapse:collapse; font-family:'Consolas','D2Coding',monospace; font-size:14px; line-height:1.6;">
+<tr>
+<td rowspan="3" style="text-align:right; padding-right:6px; vertical-align:middle;">d(i, j) &nbsp;=&nbsp; min</td>
+<td rowspan="3" style="vertical-align:middle; font-size:42px; font-weight:100; padding:0 4px; line-height:1;">{</td>
+<td style="padding:4px 8px;">d(i-1, j) + 1</td>
+<td style="padding:4px 12px;"><span class="comment">(삭제)</span></td>
+</tr>
+<tr>
+<td style="padding:4px 8px;">d(i, j-1) + 1</td>
+<td style="padding:4px 12px;"><span class="comment">(삽입)</span></td>
+</tr>
+<tr>
+<td style="padding:4px 8px;">d(i-1, j-1) + cost</td>
+<td style="padding:4px 12px;"><span class="comment">(치환: 같으면 0, 다르면 1)</span></td>
+</tr>
+</table>
+<br>edit_distance(A, B) = d(|S<sub>A</sub>|, |S<sub>B</sub>|)
+
+<span class="comment"># 조기 종료: 행의 최솟값이 max_dist를 초과하면 즉시 중단</span>
+<span class="comment"># 메모리 절약: 2행 DP (prev, curr)로 O(min(|A|,|B|)) 공간 사용</span>
+</div>
+
+<h4>4-3. 길이별 허용 임계값</h4>
+<table class="table-sm">
+<tr><th>토큰 길이</th><th>허용 편집 거리</th><th>이유</th></tr>
+<tr><td>음절 &le; 2 또는 글자 &le; 3</td><td><strong>1</strong></td><td>짧은 단어는 엄격하게 (공포 &ne; 공부)</td></tr>
+<tr><td>음절 &le; 3 또는 글자 &le; 6</td><td><strong>2</strong></td><td>중간 길이</td></tr>
+<tr><td>그 이상</td><td><strong>3</strong></td><td>긴 단어는 관대하게 (다큐맨터리 &rarr; 다큐멘터리)</td></tr>
+</table>
+
+<h4>4-4. 최적 매칭 선택</h4>
+<div class="formula-block">
+result = argmin<sub>a &isin; Aliases</sub> edit_dist(token, a)    s.t. dist &le; threshold
+
+<span class="comment"># 모든 별칭 키를 순회하면서 자모 편집 거리를 계산하고,</span>
+<span class="comment"># 임계값 이내에서 가장 작은 거리를 가진 별칭의 값을 반환한다.</span>
+<span class="comment"># 임계값을 초과하면 매칭 실패 (None 반환).</span>
+</div>
+
+<div class="code-block"><span style="color:#6c7086"># search.py:226-238</span>
+<span style="color:#89b4fa">def</span> <span style="color:#a6e3a1">_fuzzy_match_aliases</span>(token, alias_dict):
+    threshold = _get_fuzzy_threshold(token)
+    best_val, best_dist = <span style="color:#f9e2af">None</span>, threshold + 1
+    <span style="color:#89b4fa">for</span> alias_key, alias_val <span style="color:#89b4fa">in</span> alias_dict.items():
+        d = _jamo_edit_distance(token, alias_key, max_dist=threshold)
+        <span style="color:#89b4fa">if</span> d &lt; best_dist:
+            best_dist = d
+            best_val = alias_val
+    <span style="color:#89b4fa">return</span> best_val <span style="color:#89b4fa">if</span> best_dist &lt;= threshold <span style="color:#89b4fa">else</span> <span style="color:#f9e2af">None</span></div>
+
+<h4>동작 예시</h4>
+<div class="highlight-blue">
+<strong>입력:</strong> "쓰릴러 엑숀 공포 영화 추천해줘"<br><br>
+<strong>1단계</strong> 정확 매칭: "공포" &rarr; <span class="badge badge-blue">공포</span> &check;<br>
+<strong>2단계</strong> 부분 매칭: (추가 없음)<br>
+<strong>3단계</strong> 정규화: "쓰릴러" &rarr; 오타 치환 "스릴러" &rarr; <span class="badge badge-green">스릴러</span> &check;<br>
+<strong>4단계</strong> 퍼지: "엑숀" &rarr; 자모 분해 [11,4,0, 9,8,21] vs "액션" [11,1,0, 9,7,21] &rarr; 거리=2, 임계값=1 &rarr; &cross;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+"엑숀" vs 별칭 "액숀" [11,1,0, 9,8,21] &rarr; 거리=1 &le; 임계값=1 &rarr; <span class="badge badge-purple">액션</span> &check;<br><br>
+<strong>결과:</strong> 장르=[공포, 스릴러, 액션] + 텍스트 임베딩("쓰릴러 엑숀 공포 영화 추천해줘") &rarr; 쿼리 벡터 생성 &rarr; 코사인 유사도 Top-20
+</div>
+
+<div class="highlight">
+<strong>핵심:</strong> 이 4단계 파싱은 <strong>코사인 유사도 계산 자체와는 별개</strong>의 전처리 단계이다.
+파싱된 장르/키워드가 쿼리 벡터의 해당 차원을 1로 활성화시키고, 텍스트 임베딩과 함께 499D 벡터를 구성한 후, 이 벡터로 학습 데이터와의 코사인 유사도를 계산하여 추천 순위를 결정한다.
+</div>
+
+<h4>파싱과 벡터의 연결</h4>
+<div class="formula-block">파싱 결과: genres=[공포, 스릴러, 액션], keywords=[]
+
+g: [0, <strong>1</strong>, 0, <strong>1</strong>, 0, 0, 0, 0, 0, 0, 0, <strong>1</strong>, ...]   <span class="comment">액션=1, 스릴러=1, 공포=1</span>
+k: [0, 0, 0, ..., 0]                         <span class="comment">키워드 없음</span>
+n: [0.5, 0.5, 0.5, 0.5, 0.5]                 <span class="comment">기본값</span>
+t: encode("쓰릴러 엑숀 공포 영화 추천해줘")    <span class="comment">384D</span>
+
+&darr; L2 정규화 + 가중치 &darr; 연결 &rarr; V<sub>query</sub> (499D) &rarr; cos(V<sub>q</sub>, V<sub>train</sub>) &rarr; Top-20</div>
 
 <h3>7.6 대시보드 구현 (dashboard.py)</h3>
 
