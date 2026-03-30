@@ -1,0 +1,15 @@
+# 1. 의존성 설치
+pip install -r requirements.txt
+
+# 2. 데이터 캐시 생성 (첫 실행 시 필수)
+python main.py --build-cache
+
+# 3. 전체 파이프라인 실행 (6단계 + 시각화)
+python main.py
+
+# 4. 기타 옵션
+python main.py --sensitivity      # 27조합 민감도 분석
+python main.py --dashboard        # Dash 대시보드 (http://127.0.0.1:8050)
+python main.py --sweep            # 파라미터 스윕 비교
+python main.py --search           # 인터랙티브 검색
+python main.py --examples         # 검색 예시
