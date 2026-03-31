@@ -220,6 +220,7 @@ def main():
             train_movies=result["train_movies"],
             test_movies=result["test_movies"],
             clusters=result["clusters"],
+            cluster_info=result.get("cluster_info"),
         )
 
     # 인터랙티브 검색

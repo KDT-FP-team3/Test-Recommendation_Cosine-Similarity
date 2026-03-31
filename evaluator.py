@@ -56,12 +56,14 @@ class RecommendationEvaluator:
             sims = [r["similarity"] for r in recs]
             all_sims.extend(sims)
 
-            # 장르 Precision@K
-            genre_hits = sum(
-                1 for r in recs
-                if set(query_movie.get("genres", [])) & set(r.get("genres", []))
-            )
-            genre_prec = genre_hits / len(recs) if recs else 0
+            # 장르 Jaccard 유사도 (평균)
+            q_genres = set(query_movie.get("genres", []))
+            jaccard_scores = []
+            for r in recs:
+                r_genres = set(r.get("genres", []))
+                union = q_genres | r_genres
+                jaccard_scores.append(len(q_genres & r_genres) / len(union) if union else 0)
+            genre_prec = float(np.mean(jaccard_scores)) if jaccard_scores else 0
             all_genre_prec.append(genre_prec)
 
             # 키워드 Precision@K

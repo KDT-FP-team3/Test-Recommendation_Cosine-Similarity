@@ -130,17 +130,19 @@ class SensitivityAnalyzer:
                 # 평균 유사도
                 avg_similarity = float(np.mean(combo_sims)) if combo_sims else 0.0
 
-                # 장르 정밀도: Top-20 중 쿼리와 장르 1개 이상 공유하는 비율
+                # 장르 Jaccard 유사도 (평균): 교집합/합집합
                 query_genres = test_genres.get(query_title, set())
                 if combo_ids and query_genres:
-                    genre_hits = 0
+                    jaccard_scores = []
                     for mid in combo_ids:
                         rec_movie = train_data.get(mid)
                         if rec_movie:
                             rec_genres = set(rec_movie.get("genres", []))
-                            if query_genres & rec_genres:
-                                genre_hits += 1
-                    genre_precision = genre_hits / len(combo_ids)
+                            union = query_genres | rec_genres
+                            jaccard_scores.append(
+                                len(query_genres & rec_genres) / len(union) if union else 0
+                            )
+                    genre_precision = float(np.mean(jaccard_scores)) if jaccard_scores else 0.0
                 else:
                     genre_precision = 0.0
 

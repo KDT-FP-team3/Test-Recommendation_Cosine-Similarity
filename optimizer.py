@@ -1,5 +1,5 @@
 """
-optimizer.py -- 시뮬레이션 어닐링 기반 가중치 최적화
+optimizer.py -- 시뮬레이티드 어닐링 기반 가중치 최적화
 ====================================================================
 테스트 영화 데이터셋에 대한 평가 메트릭을 최적화하는 가중치 조합을 탐색.
 
@@ -10,7 +10,7 @@ optimizer.py -- 시뮬레이션 어닐링 기반 가중치 최적화
 탐색 전략:
   1. 초기값: 현재 가중치
   2. 이웃 생성: 각 가중치를 ±step 범위에서 무작위 perturbation
-  3. 시뮬레이션 어닐링: 온도 감소에 따라 악화 해 수용 확률 감소
+  3. 시뮬레이티드 어닐링: 온도 감소에 따라 악화 해 수용 확률 감소
   4. 조기 종료: 연속 patience회 개선 없으면 종료
 """
 
@@ -23,7 +23,7 @@ import config
 
 
 class WeightOptimizer:
-    """시뮬레이션 어닐링 기반 가중치 최적화기"""
+    """시뮬레이티드 어닐링 기반 가중치 최적화기"""
 
     def __init__(self, embedding, train_movies, test_movies, coords=None):
         self.embedding = embedding
@@ -81,7 +81,7 @@ class WeightOptimizer:
                  patience=10,
                  progress_callback=None):
         """
-        시뮬레이션 어닐링으로 최적 가중치를 탐색한다.
+        시뮬레이티드 어닐링으로 최적 가중치를 탐색한다.
 
         Parameters
         ----------

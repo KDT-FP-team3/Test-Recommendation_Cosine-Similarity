@@ -288,14 +288,14 @@ code { background: var(--bg-inline-code); padding: 2px 6px; border-radius: 3px; 
 <div class="section" id="overview">
 <h2>1. 시스템 개요</h2>
 
-<p>KMDB(한국영화데이터베이스)에서 수집한 <strong>19,354편</strong>(1980~2026년)의 영화를
+<p><a href="https://www.kmdb.or.kr/main" target="_blank" style="color:var(--text-link)">KMDB(한국영화데이터베이스)</a>에서 수집한 <strong>19,354편</strong>(1980~2026년)의 영화를
 <strong>499차원 하이브리드 벡터</strong>로 변환하고, <strong>코사인 유사도</strong>를 기반으로
 가장 유사한 영화 <strong>Top-20</strong>을 추천하는 콘텐츠 기반 필터링 시스템이다.</p>
 
 <div class="grid-3">
 <div class="card">
 <h4>입력 데이터</h4>
-<p>554개 JSON 파일<br>19,354편 영화<br>66개 장르, 13,575개 키워드<br>19,791개 포스터 이미지</p>
+<p>554개 JSON 파일 · 약 3.4GB<br>19,354편 영화<br>66개 장르, 13,575개 키워드<br>19,791개 포스터 이미지<br><span style="font-size:0.85em;color:var(--text-faint)">출처: <a href="https://www.kmdb.or.kr/main" target="_blank" style="color:var(--text-link)">KMDB</a></span></p>
 </div>
 <div class="card">
 <h4>벡터 구조</h4>
@@ -1329,7 +1329,7 @@ _sensitivity_progress = {
 <table>
 <tr><th>메트릭</th><th>수식</th><th>의미</th><th>이상적 값</th></tr>
 <tr><td>avg_similarity</td><td>mean(sim<sub>1</sub>..sim<sub>K</sub>)</td><td>추천 영화의 평균 유사도</td><td>높을수록 좋음 (&ge;0.5)</td></tr>
-<tr><td>genre_precision@K</td><td>(장르 일치 수) / K</td><td>쿼리와 장르가 공통인 추천 비율</td><td>높을수록 좋음 (&ge;0.3)</td></tr>
+<tr><td>genre_precision@K</td><td>mean(Jaccard(query, rec<sub>i</sub>))</td><td>쿼리-추천 장르 Jaccard 유사도 평균 (교집합/합집합)</td><td>높을수록 좋음 (&ge;0.3)</td></tr>
 <tr><td>keyword_precision@K</td><td>(키워드 일치 수) / K</td><td>쿼리와 키워드가 공통인 추천 비율</td><td>높을수록 좋음</td></tr>
 <tr><td>diversity</td><td>mean(1 - cos(rec<sub>i</sub>, rec<sub>j</sub>))</td><td>추천 목록 내부의 다양성</td><td>적정 범위 (너무 낮으면 단조로움)</td></tr>
 <tr><td>text_coherence</td><td>mean(cos(text<sub>i</sub>, text<sub>j</sub>))</td><td>추천 영화 줄거리 간 의미적 일관성</td><td>적정 범위</td></tr>
@@ -1350,7 +1350,7 @@ _sensitivity_progress = {
 <p>아래 조건 중 <strong>하나라도</strong> 해당하면 "부적합":</p>
 <table class="table-sm">
 <tr><th>조건</th><th>임계값</th><th>의미</th></tr>
-<tr><td>genre_precision &lt; 0.3</td><td>30%</td><td>추천 영화의 장르 관련성이 너무 낮음</td></tr>
+<tr><td>genre_precision (Jaccard) &lt; 0.3</td><td>30%</td><td>추천 영화의 장르 Jaccard 유사도가 너무 낮음</td></tr>
 <tr><td>avg_similarity &lt; 0.5</td><td>0.5</td><td>전체적인 유사도가 너무 낮음</td></tr>
 <tr><td>avg_3d_distance &gt; 10.0</td><td>10.0</td><td>PCA 공간에서 너무 멀리 떨어짐</td></tr>
 <tr><td>Top1 직관성 = "낮음"</td><td>--</td><td>1위 추천에 표면적 공통점이 없음</td></tr>
@@ -1385,7 +1385,7 @@ _sensitivity_progress = {
 <tr><td>Spearman &rho;</td><td>1 - 6&middot;&Sigma;d<sub>i</sub><sup>2</sup> / (n(n<sup>2</sup>-1))</td><td>-1 ~ 1</td><td>공통 영화의 순위 상관. 1=동일 순서, 0=무관</td></tr>
 <tr><td>평균 순위 변동</td><td>&Sigma;(|rank<sub>base</sub>(i) - rank<sub>c</sub>(i)| or K) / K</td><td>0 ~</td><td>평균 순위 이동 폭. 이탈 영화는 K로 간주</td></tr>
 <tr><td>평균 유사도</td><td>mean(cos(V<sub>q</sub><sup>c</sup>, V<sub>i</sub><sup>c</sup>))</td><td>0 ~ 1</td><td>해당 조합의 추천 품질 지표</td></tr>
-<tr><td>장르 정밀도</td><td>(장르 1개 이상 공유) / K</td><td>0 ~ 1</td><td>장르 관련성 변화</td></tr>
+<tr><td>장르 정밀도</td><td>mean(Jaccard(query, rec<sub>i</sub>))</td><td>0 ~ 1</td><td>장르 Jaccard 유사도 변화</td></tr>
 </table>
 
 <h3>9.3 분석 과정</h3>
@@ -1474,7 +1474,7 @@ _sensitivity_progress = {
 
 각 항의 역할:
   avg_similarity   (0.35) : 추천 영화의 평균 코사인 유사도          <span class="comment"># 높을수록 유사한 영화 추천</span>
-  genre_precision  (0.30) : Top-20 중 쿼리와 장르 공유 비율         <span class="comment"># 높을수록 장르 관련성 높음</span>
+  genre_precision  (0.30) : 쿼리-추천 장르 Jaccard 유사도 평균       <span class="comment"># 높을수록 장르 관련성 높음</span>
   text_coherence   (0.25) : 추천 영화 줄거리 간 의미적 일관성       <span class="comment"># 높을수록 주제 일관</span>
   diversity_penalty(0.10) : |diversity - 0.3|                        <span class="comment"># 0.3이 이상적 다양성, 편차 시 감점</span>
 </div>
@@ -1489,7 +1489,7 @@ _sensitivity_progress = {
 </table>
 
 <div class="highlight-blue highlight">
-<strong>설계 의도</strong>: 유사도(0.35)와 장르 정밀도(0.30)를 합쳐 0.65로 "정확성"을 주로 추구하되, 텍스트 일관성(0.25)으로 의미적 품질을 보장하고, 다양성 패널티(0.10)로 단조로운 추천을 방지한다. 다양성 목표값 0.3은 "적당히 다양하되 주제에서 벗어나지 않는" 균형점이다.
+<strong>설계 의도</strong>: 유사도(0.35)와 장르 Jaccard 유사도(0.30)를 합쳐 0.65로 "정확성"을 주로 추구하되, 텍스트 일관성(0.25)으로 의미적 품질을 보장하고, 다양성 패널티(0.10)로 단조로운 추천을 방지한다. 다양성 목표값 0.3은 "적당히 다양하되 주제에서 벗어나지 않는" 균형점이다.
 </div>
 
 <h3>10.3 시뮬레이티드 어닐링 알고리즘</h3>
@@ -1551,7 +1551,7 @@ Accuracy = (통과한 조건 수) / 4
 
 조건:
   1) avg_similarity &ge; 0.5   <span class="comment"># THRESHOLD_AVG_SIMILARITY</span>
-  2) genre_precision &ge; 0.3  <span class="comment"># THRESHOLD_GENRE_PRECISION</span>
+  2) genre_precision (Jaccard) &ge; 0.3  <span class="comment"># THRESHOLD_GENRE_PRECISION</span>
   3) text_coherence &ge; 0.3   <span class="comment"># 의미적 일관성 최소 기준</span>
   4) 0.15 &le; diversity &le; 0.6  <span class="comment"># 다양성 허용 범위</span>
 </div>
@@ -1706,7 +1706,8 @@ get_effective_weights():
 
 <!-- Footer -->
 <div style="text-align:center; color:var(--text-faint); padding:20px; font-size:12px;">
-KMDB 영화 추천 시스템 종합 분석 보고서 | KDT-FT-team3-Chainers
+KMDB 영화 추천 시스템 종합 분석 보고서 | KDT-FT-team3-Chainers<br>
+데이터셋 출처: <a href="https://www.kmdb.or.kr/main" target="_blank" style="color:var(--text-link)">KMDB(한국영화데이터베이스)</a>
 </div>
 
 </div><!-- container -->

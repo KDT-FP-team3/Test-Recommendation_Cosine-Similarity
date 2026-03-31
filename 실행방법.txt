@@ -1,3 +1,9 @@
+# 데이터셋 출처
+# KMDB(한국영화데이터베이스): https://www.kmdb.or.kr/main
+# 데이터셋 용량 : 3.4GB -> 업로드 생략
+# 루트 폴더 경로에 Data_new 폴더를 생성하고, 데이터셋 movies 폴더를 넣는다.
+# 각 년도 별로 구분된 폴더에는 영화 포스터 이미지가 있고 json 파일에 영화 정보가 있다.
+
 # 1. 의존성 설치
 pip install -r requirements.txt
 

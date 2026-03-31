@@ -10,7 +10,7 @@ visualizer.py -- 시각화 모듈
   4. similarity_heatmap.html  - 테스트 영화 vs 추천 영화 유사도 히트맵
   5. evaluation_report.html   - 평가 메트릭 막대 차트
   6. weight_impact.html       - 그룹 기여도 누적 막대 차트
-  7. sensitivity_analysis.html - 민감도 분석 (placeholder)
+  7. sensitivity_analysis.html - 민감도 분석 (기여도 차트 + 클러스터 정보 + 히트맵 + 상세 테이블)
 """
 
 import os
@@ -20,7 +20,6 @@ import plotly.io as pio
 from plotly.subplots import make_subplots
 
 import config
-from data_loader import get_data_field_info
 
 _CLUSTER_COLORS = [
     "#E74C3C", "#3498DB", "#2ECC71", "#F1C40F",
@@ -54,6 +53,43 @@ class MovieVisualizer:
         self.result = pipeline_result
         self.output_dir = config.RESULTS_DIR
 
+    def _get_pc_group_labels(self):
+        """각 PC 축의 주요 특징 그룹 기여도를 판별하여 라벨 생성."""
+        reducer = self.result.get("reducer")
+        emb = self.result.get("embedding")
+        if reducer is None or emb is None:
+            return {}
+
+        components = reducer.get_components()
+        if components is None:
+            return {}
+
+        # 그룹별 차원 경계
+        g_end = emb.genre_dim
+        k_end = g_end + emb.keyword_dim
+        n_end = k_end + emb.numeric_dim
+        t_end = n_end + emb.text_dim
+
+        group_names = ["장르", "키워드", "수치", "텍스트"]
+        group_ranges = [(0, g_end), (g_end, k_end), (k_end, n_end), (n_end, t_end)]
+
+        labels = {}
+        for i in range(min(len(components), 3)):
+            comp = components[i]
+            contributions = []
+            for name, (start, end) in zip(group_names, group_ranges):
+                contributions.append((name, np.sum(comp[start:end] ** 2)))
+
+            total = sum(c for _, c in contributions)
+            if total < 1e-10:
+                continue
+
+            parts = [f"{name} {val / total:.0%}"
+                     for name, val in sorted(contributions, key=lambda x: x[1], reverse=True)]
+            labels[i] = " / ".join(parts)
+
+        return labels
+
     def generate_all(self):
         os.makedirs(self.output_dir, exist_ok=True)
         self._gen_sankey()
@@ -64,54 +100,195 @@ class MovieVisualizer:
         self._gen_weight_impact()
         print(f"[visualizer] 시각화 {self.output_dir}/ 에 저장 완료")
 
-    # 1. Sankey: KMDB 필드 -> 499D
+    # 1. Sankey: KMDB 필드 -> 전처리 -> 그룹(L2+가중치) -> 499D
     def _gen_sankey(self):
-        fields = get_data_field_info()
-        sources, targets, values, labels, colors = [], [], [], [], []
+        weights = config.get_effective_weights()
+        wg = weights["genre"]
+        wk = weights["keyword"]
+        wn = weights["numeric"]
+        wt = weights["text"]
 
-        # 노드: 0~N-1 = 필드, N~N+3 = 그룹, N+4 = 최종벡터
-        field_names = [k for k in fields if fields[k]["category"] == "embedding"]
-        group_map = {"one-hot": "장르 (30D)", "binary": "키워드 (80D)",
-                     "numeric": "수치 (5D)", "text": "텍스트 (384D)"}
-        group_list = list(group_map.values())
+        # 그룹 색상 팔레트
+        C_GENRE = "#E74C3C"     # 빨강
+        C_KW    = "#3498DB"     # 파랑
+        C_NUM   = "#F1C40F"     # 노랑
+        C_TEXT  = "#2ECC71"     # 초록
+        C_META  = "#95A5A6"     # 회색
 
-        labels = field_names + group_list + ["499D 벡터"]
-        n_fields = len(field_names)
-        n_groups = len(group_list)
-        final_idx = n_fields + n_groups
+        def _alpha(hex_color, a=0.35):
+            r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
+            return f"rgba({r},{g},{b},{a})"
 
-        group_colors = ["#E74C3C", "#3498DB", "#F1C40F", "#2ECC71"]
+        # 차원 비율 압축 (384D가 전체를 지배하지 않도록 제곱근 스케일)
+        import math
+        def _scaled(dim):
+            return max(math.sqrt(dim), 1.0)
 
-        for i, fname in enumerate(field_names):
-            f = fields[fname]
-            enc = f["encoding"]
-            gname = group_map.get(enc, "수치 (5D)")
-            gidx = n_fields + group_list.index(gname)
-            sources.append(i)
-            targets.append(gidx)
-            values.append(max(f.get("embedding_dim", 1), 1))
+        # ==============================================================
+        # 노드 정의 (4단계)
+        # ==============================================================
+        node_labels = []
+        node_colors = []
+        node_x = []
+        node_y = []
+        node_hovers = []
 
-        for gi in range(n_groups):
-            sources.append(n_fields + gi)
-            targets.append(final_idx)
-            dims = [30, 80, 5, 384]
-            values.append(dims[gi])
+        def add_node(label, color, x, y, hover=""):
+            idx = len(node_labels)
+            node_labels.append(label)
+            node_colors.append(color)
+            node_x.append(x)
+            node_y.append(y)
+            node_hovers.append(hover or label)
+            return idx
 
-        node_colors = (
-            ["#95A5A6"] * n_fields
-            + group_colors
-            + ["#2C3E50"]
-        )
+        # --- Layer 1: KMDB 원본 필드 (x=0.01) ---
+        n_genre    = add_node("genre\n(장르 66종)",    C_GENRE, 0.01, 0.01,
+                              "KMDB 원본 장르 (66종)\n영화별 1~5개 장르 태그")
+        n_keywords = add_node("keywords\n(키워드)",     C_KW,    0.01, 0.14,
+                              "KMDB 키워드 텍스트\n영화별 다수 키워드")
+        n_runtime  = add_node("runtime\n(러닝타임)",    C_NUM,   0.01, 0.30,
+                              "상영 시간 (분)\n결측 시 0.5로 대체")
+        n_year     = add_node("prodYear\n(제작연도)",   C_NUM,   0.01, 0.36,
+                              "제작 연도 (1980~2026)")
+        n_actors   = add_node("actors\n(출연진)",       C_NUM,   0.01, 0.42,
+                              "출연 배우 목록\n→ 출연진 수 파생")
+        n_plots    = add_node("plots\n(줄거리)",        C_TEXT,  0.01, 0.55,
+                              "줄거리 텍스트\n→ 문장 임베딩 입력")
+        n_title    = add_node("title (제목)",           C_META,  0.01, 0.74,
+                              "영화 제목 (식별자)")
+        n_nation   = add_node("nation (제작국)",        C_META,  0.01, 0.78,
+                              "제작 국가")
+        n_direct   = add_node("directors (감독)",       C_META,  0.01, 0.82,
+                              "감독 정보")
+        n_rating   = add_node("rating (등급)",          C_META,  0.01, 0.86,
+                              "관람 등급")
+        n_poster   = add_node("posters (포스터)",       C_META,  0.01, 0.90,
+                              "포스터 이미지 URL")
+        n_audi     = add_node("audiAcc (관객수)",       C_META,  0.01, 0.94,
+                              "누적 관객수")
+        n_awards   = add_node("Awards (수상)",          C_META,  0.01, 0.98,
+                              "수상 정보")
 
+        # --- Layer 2: 전처리/인코딩 방법 (x=0.35) ---
+        n_proc_genre = add_node("장르 매핑\n(66→30 원-핫)",          C_GENRE, 0.35, 0.05,
+                                "GENRE_MAP으로 66종→30종 표준화\n원-핫 인코딩 (30D)")
+        n_proc_kw    = add_node("키워드 필터\n(상위 80 바이너리)",   C_KW,    0.35, 0.18,
+                                "빈도 ≥93 기준 상위 80개 선별\n바이너리 인코딩 (80D)")
+        n_proc_num   = add_node("수치 파생\n(Min-Max 정규화)",       C_NUM,   0.35, 0.36,
+                                "5종 파생 수치 (0~1 범위)\n"
+                                "runtime_norm, year_norm,\n"
+                                "keyword_richness, cast_size_norm,\n"
+                                "genre_count_norm")
+        n_proc_text  = add_node("문장 임베딩\n(MiniLM-L12-v2)",     C_TEXT,  0.35, 0.55,
+                                f"sentence-transformers\n{config.TEXT_MODEL_NAME.split('/')[-1]}\n→ {config.TEXT_EMBED_DIM}D 벡터")
+        n_proc_meta  = add_node("메타데이터\n(비임베딩)",            C_META,  0.35, 0.86,
+                                "임베딩에 포함되지 않는\n참조/표시용 정보 (7종)")
+
+        # --- Layer 3: 특징 그룹 (L2 + 가중치) (x=0.65) ---
+        n_grp_genre = add_node(f"장르 (30D)\nL2정규화 · ×{wg}",     C_GENRE, 0.65, 0.05,
+                               f"장르 원-핫 벡터 (30D)\nL2 정규화 후 가중치 ×{wg} 적용")
+        n_grp_kw    = add_node(f"키워드 (80D)\nL2정규화 · ×{wk}",   C_KW,    0.65, 0.18,
+                               f"키워드 바이너리 벡터 (80D)\nL2 정규화 후 가중치 ×{wk} 적용")
+        n_grp_num   = add_node(f"수치 (5D)\nL2정규화 · ×{wn}",      C_NUM,   0.65, 0.36,
+                               f"파생 수치 벡터 (5D)\nL2 정규화 후 가중치 ×{wn} 적용")
+        n_grp_text  = add_node(f"텍스트 (384D)\nL2정규화 · ×{wt}",  C_TEXT,  0.65, 0.55,
+                               f"줄거리 임베딩 벡터 (384D)\nL2 정규화 후 가중치 ×{wt} 적용")
+
+        # --- Layer 4: 최종 벡터 (x=0.99) ---
+        n_final = add_node(f"499D\n하이브리드 벡터",                  "#2C3E50", 0.99, 0.30,
+                           f"4그룹 Concatenation\n"
+                           f"장르(30) + 키워드(80) + 수치(5) + 텍스트(384)\n"
+                           f"= {config.TOTAL_DIM}D")
+        n_meta_final = add_node("메타데이터\n(참조 정보)",            C_META, 0.99, 0.86,
+                                "제목, 감독, 국가, 등급 등\n표시/검색용 (비임베딩)")
+
+        # ==============================================================
+        # 링크 정의 (Sankey 흐름 보존: 노드 입출력 합 일치 필수)
+        # ==============================================================
+        sources = []
+        targets = []
+        values = []
+        link_colors = []
+        link_hovers = []
+
+        def add_link(src, tgt, vis_val, color, hover=""):
+            """vis_val: 이미 스케일링된 시각적 밴드 폭"""
+            sources.append(src)
+            targets.append(tgt)
+            values.append(vis_val)
+            link_colors.append(_alpha(color, 0.35))
+            link_hovers.append(hover)
+
+        # 흐름 보존을 위한 스케일 값 사전 계산
+        s1   = _scaled(1)      # 1.0   (1D 개별 수치)
+        s30  = _scaled(30)     # 5.48  (장르 30D)
+        s80  = _scaled(80)     # 8.94  (키워드 80D)
+        s384 = _scaled(384)    # 19.6  (텍스트 384D)
+        s_num  = 5 * s1        # 5.0   (수치 5 × 1D 입력 합)
+        s_meta = 7 * s1        # 7.0   (메타데이터 7 × 1D 입력 합)
+
+        # Layer 1 → Layer 2
+        add_link(n_genre,    n_proc_genre, s30,  C_GENRE, "장르 태그 → 30개 표준 카테고리 원-핫 (30D)")
+        add_link(n_genre,    n_proc_num,   s1,   C_NUM,   "장르 수 → genre_count_norm (1D)")
+        add_link(n_keywords, n_proc_kw,    s80,  C_KW,    "키워드 → 상위 80개 바이너리 (80D)")
+        add_link(n_keywords, n_proc_num,   s1,   C_NUM,   "키워드 수 → keyword_richness (1D)")
+        add_link(n_runtime,  n_proc_num,   s1,   C_NUM,   "러닝타임 → runtime_norm (1D)")
+        add_link(n_year,     n_proc_num,   s1,   C_NUM,   "제작연도 → year_norm (1D)")
+        add_link(n_actors,   n_proc_num,   s1,   C_NUM,   "출연진 수 → cast_size_norm (1D)")
+        add_link(n_plots,    n_proc_text,  s384, C_TEXT,  f"줄거리 → {config.TEXT_EMBED_DIM}D 문장 임베딩")
+
+        for n_meta_src in [n_title, n_nation, n_direct, n_rating, n_poster, n_audi, n_awards]:
+            add_link(n_meta_src, n_proc_meta, s1, C_META, "비임베딩 메타데이터 (1종)")
+
+        # Layer 2 → Layer 3 (입력 합 = 출력)
+        add_link(n_proc_genre, n_grp_genre, s30,   C_GENRE, "원-핫 30D → L2 정규화")
+        add_link(n_proc_kw,    n_grp_kw,    s80,   C_KW,    "바이너리 80D → L2 정규화")
+        add_link(n_proc_num,   n_grp_num,   s_num, C_NUM,   "수치 5D → L2 정규화")
+        add_link(n_proc_text,  n_grp_text,  s384,  C_TEXT,  f"임베딩 {config.TEXT_EMBED_DIM}D → L2 정규화")
+
+        # Layer 3 → Layer 4 (입력 합 = 출력)
+        add_link(n_grp_genre, n_final, s30,   C_GENRE, f"장르 30D × {wg} → 연결")
+        add_link(n_grp_kw,    n_final, s80,   C_KW,    f"키워드 80D × {wk} → 연결")
+        add_link(n_grp_num,   n_final, s_num, C_NUM,   f"수치 5D × {wn} → 연결")
+        add_link(n_grp_text,  n_final, s384,  C_TEXT,  f"텍스트 384D × {wt} → 연결")
+        add_link(n_proc_meta, n_meta_final, s_meta, C_META, "7종 메타데이터 (비임베딩)")
+
+        # ==============================================================
+        # Figure 생성
+        # ==============================================================
         fig = go.Figure(go.Sankey(
-            node=dict(label=labels, color=node_colors, pad=15, thickness=20),
-            link=dict(source=sources, target=targets, value=values,
-                      color="rgba(150,150,150,0.3)"),
+            arrangement="snap",
+            node=dict(
+                label=node_labels,
+                color=node_colors,
+                x=node_x,
+                y=node_y,
+                pad=18,
+                thickness=22,
+                customdata=node_hovers,
+                hovertemplate="%{customdata}<extra></extra>",
+            ),
+            link=dict(
+                source=sources,
+                target=targets,
+                value=values,
+                color=link_colors,
+                customdata=link_hovers,
+                hovertemplate="%{customdata}<extra></extra>",
+            ),
         ))
         fig.update_layout(
-            title="KMDB 데이터 필드 -> 499D 하이브리드 벡터 매핑",
-            font=dict(size=13),
-            width=config.FIGURE_WIDTH, height=config.FIGURE_HEIGHT,
+            title=dict(
+                text=(f"KMDB 데이터 파이프라인: 원본 필드 → 전처리 → L2 정규화 + 가중치 → "
+                      f"{config.TOTAL_DIM}D 하이브리드 벡터"
+                      f"<br><sub>가중치: 장르 ×{wg} | 키워드 ×{wk} | 수치 ×{wn} | 텍스트 ×{wt}</sub>"),
+                font=dict(size=20),
+            ),
+            font=dict(size=16),
+            width=config.FIGURE_WIDTH,
+            height=max(config.FIGURE_HEIGHT, 1300),
+            margin=dict(t=80, b=30, l=10, r=10),
         )
         pio.write_html(fig, os.path.join(self.output_dir, "data_field_diagram.html"))
 
@@ -174,10 +351,29 @@ class MovieVisualizer:
                             showlegend=False, hoverinfo="skip",
                         ))
 
+        # PC 축별 주요 그룹 라벨 생성
+        pc_labels = self._get_pc_group_labels()
+        var_ratio = []
+        reducer = self.result.get("reducer")
+        if reducer is not None:
+            var_ratio = reducer.get_explained_variance()
+
+        def _make_3d_label(pc_idx, pc_name):
+            parts = []
+            if len(var_ratio) > pc_idx:
+                parts.append(f"분산 {var_ratio[pc_idx]:.1%}")
+            if pc_idx in pc_labels:
+                parts.append(pc_labels[pc_idx])
+            return f"{pc_name} ({', '.join(parts)})" if parts else pc_name
+
         fig.update_layout(
             title="3D 임베딩 공간 (PCA) -- 클러스터 및 추천 연결선",
             width=config.FIGURE_WIDTH, height=config.FIGURE_HEIGHT,
-            scene=dict(xaxis_title="PC1", yaxis_title="PC2", zaxis_title="PC3"),
+            scene=dict(
+                xaxis_title=_make_3d_label(0, "PC1"),
+                yaxis_title=_make_3d_label(1, "PC2"),
+                zaxis_title=_make_3d_label(2, "PC3"),
+            ),
         )
         pio.write_html(fig, os.path.join(self.output_dir, "embedding_3d.html"))
 
@@ -188,15 +384,27 @@ class MovieVisualizer:
         clusters = self.result["clusters"]
         cluster_info = self.result.get("cluster_info", {})
 
-        # PCA 분산 비율로 축 라벨 생성
+        # PCA 분산 비율 + 주요 그룹으로 축 라벨 생성
         reducer = self.result.get("reducer")
+        pc_labels = self._get_pc_group_labels()
         x_label = "PC1"
         y_label = "PC2"
         if reducer is not None:
             var_ratio = reducer.get_explained_variance()
             if len(var_ratio) >= 2:
-                x_label = f"PC1 (분산 설명률 {var_ratio[0]:.1%})"
-                y_label = f"PC2 (분산 설명률 {var_ratio[1]:.1%})"
+                x_parts = [f"분산 설명률 {var_ratio[0]:.1%}"]
+                y_parts = [f"분산 설명률 {var_ratio[1]:.1%}"]
+                if 0 in pc_labels:
+                    x_parts.append(pc_labels[0])
+                if 1 in pc_labels:
+                    y_parts.append(pc_labels[1])
+                x_label = f"PC1 ({', '.join(x_parts)})"
+                y_label = f"PC2 ({', '.join(y_parts)})"
+            elif pc_labels:
+                if 0 in pc_labels:
+                    x_label = f"PC1 ({pc_labels[0]})"
+                if 1 in pc_labels:
+                    y_label = f"PC2 ({pc_labels[1]})"
 
         fig = go.Figure()
         unique_clusters = sorted(set(clusters))
@@ -383,7 +591,8 @@ class MovieVisualizer:
 
     # 7. 민감도 분석 HTML
     def generate_sensitivity_html(self, all_results, analysis,
-                                   train_movies, test_movies, clusters):
+                                   train_movies, test_movies, clusters,
+                                   cluster_info=None):
         """
         81조합 민감도 분석 결과를 standalone HTML로 생성한다.
 
@@ -398,6 +607,8 @@ class MovieVisualizer:
         test_movies : list[dict]
         clusters : np.ndarray
             학습 데이터 클러스터 레이블
+        cluster_info : dict, optional
+            클러스터별 장르/키워드 정보 (clustering.get_cluster_info 결과)
         """
         import json as _json
 
@@ -408,6 +619,38 @@ class MovieVisualizer:
         for i, mid in enumerate(train_ids):
             if i < len(clusters):
                 cluster_map[mid] = int(clusters[i])
+
+        # 클러스터 정보 테이블 HTML
+        cluster_info_html = ""
+        if cluster_info:
+            genre_colors = getattr(config, "GENRE_COLORS", {})
+            cluster_info_html = '<div class="ci-wrap"><h4>클러스터 정보</h4><table class="ci-table"><thead><tr>'
+            cluster_info_html += '<th>클러스터</th><th>영화 수</th><th>주요 장르</th><th>주요 키워드</th>'
+            cluster_info_html += '</tr></thead><tbody>'
+            for cid in range(config.KMEANS_N_CLUSTERS):
+                key = f"클러스터 {cid}"
+                cdata = cluster_info.get(key, {})
+                if not cdata:
+                    continue
+                count = cdata.get("count", 0)
+                cl_color = _CLUSTER_COLORS[cid % len(_CLUSTER_COLORS)]
+
+                # 장르 배지
+                genre_cells = ""
+                for g, cnt in cdata.get("top_genres", [])[:3]:
+                    gc = genre_colors.get(g, "#95a5a6")
+                    genre_cells += f'<span class="ci-genre" style="background:{gc};color:#fff">{g}({cnt})</span> '
+
+                # 키워드
+                kw_text = ", ".join(f"{k}({cnt})" for k, cnt in cdata.get("top_keywords", [])[:3])
+
+                cluster_info_html += f'<tr>'
+                cluster_info_html += f'<td><span class="cluster-badge" style="background:{cl_color};color:#fff">C{cid}</span></td>'
+                cluster_info_html += f'<td>{count:,}</td>'
+                cluster_info_html += f'<td class="ci-genres">{genre_cells}</td>'
+                cluster_info_html += f'<td class="ci-kw">{kw_text}</td>'
+                cluster_info_html += '</tr>'
+            cluster_info_html += '</tbody></table></div>'
 
         # ---------------------------------------------------------------
         # 81조합별 집계 (테스트 영화 평균)
@@ -594,7 +837,6 @@ class MovieVisualizer:
                 if compare_to_baseline:
                     html += '<th>변동</th>'
                 html += '</tr></thead><tbody>'
-                item_id_set = {item["id"] for item in items}
                 for i, item in enumerate(items):
                     cl = item["cluster"]
                     cl_color = _CLUSTER_COLORS[cl % len(_CLUSTER_COLORS)] if cl >= 0 else "#ccc"
@@ -672,6 +914,17 @@ h4 {{ margin: 0 0 8px; font-size: 14px; color: #555; text-align: center; }}
 .legend-item {{ display: flex; align-items: center; gap: 6px; }}
 .legend-swatch {{ width: 20px; height: 14px; border-radius: 3px; border: 1px solid #bbb; }}
 
+/* Cluster info table */
+.ci-wrap {{ margin-bottom: 20px; }}
+.ci-wrap h4 {{ margin: 0 0 8px; font-size: 15px; color: #2c3e50; }}
+.ci-table {{ width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 10px; }}
+.ci-table th {{ background: #2c3e50; color: #fff; padding: 8px 6px; text-align: center; }}
+.ci-table td {{ padding: 6px 5px; border-bottom: 1px solid #e0e0e0; text-align: center; }}
+.ci-table tr:hover {{ background: rgba(52,152,219,0.06); }}
+.ci-genres {{ text-align: left !important; }}
+.ci-kw {{ text-align: left !important; font-size: 12px; color: #555; }}
+.ci-genre {{ display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: bold; margin: 1px 2px; }}
+
 /* Rank comparison */
 .rank-section {{ margin-bottom: 30px; }}
 .rank-tables-row {{ display: flex; gap: 15px; overflow-x: auto; }}
@@ -731,6 +984,7 @@ h4 {{ margin: 0 0 8px; font-size: 14px; color: #555; text-align: center; }}
 <!-- Section 3: Rank comparison -->
 <div class="section">
 <h2>3. 순위 비교 (기준선 vs 최고/최저 유사도 조합)</h2>
+{cluster_info_html}
 {rank_sections_html}
 </div>
 

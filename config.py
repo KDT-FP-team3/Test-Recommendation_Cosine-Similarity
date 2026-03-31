@@ -17,8 +17,6 @@ DATA_DIR = "Data_new/movies"
 CACHE_DIR = "data"
 CACHE_PATH = os.path.join(CACHE_DIR, "kmdb_processed.pkl")
 TEXT_EMBED_CACHE = os.path.join(CACHE_DIR, "text_embeddings.npy")
-METADATA_CACHE = os.path.join(CACHE_DIR, "metadata_vectors.npy")
-THUMBNAIL_DIR = os.path.join(CACHE_DIR, "thumbnails")
 RESULTS_DIR = "results"
 SAVED_WEIGHTS_PATH = os.path.join(CACHE_DIR, "saved_weights.json")
 
@@ -110,7 +108,8 @@ GENRE_MAP = {
     "느와르": "느와르",
     "애정": "로맨스",
     "오페라": "뮤지컬",
-    "애니매에이션": "애니메이션",
+    "애니메에이션": "애니메이션",
+    "애니매이션": "애니메이션",
 }
 
 # ===================================================================
@@ -262,7 +261,6 @@ SENSITIVITY_LEVELS = {
     "중": 1.0,
     "상": 1.5,
 }
-SENSITIVITY_SWEEP_VALUES = [0.5, 1.0, 1.5]
 # 4개 가중치(장르, 키워드, 수치, 텍스트)로 81조합
 
 SENSITIVITY_TEXT_QUERIES = [

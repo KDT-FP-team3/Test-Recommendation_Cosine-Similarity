@@ -74,7 +74,7 @@ class HybridMovieEmbedding:
         self.use_cuda = HAS_TORCH and CUDA_AVAILABLE
         self.device = torch.device("cuda") if self.use_cuda else None
 
-        # StandardScaler (전체 벡터용)
+        # 표준화: CUDA -> 수동 mean/std, CPU -> StandardScaler
         if self.use_cuda:
             self._mean = None
             self._std = None

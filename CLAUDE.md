@@ -25,8 +25,8 @@ Python 3.12 | NumPy, scikit-learn | sentence-transformers(paraphrase-multilingua
 | 파일 | 역할 |
 |------|------|
 | config.py | 중앙 파라미터 관리 + 가중치 영속화 (load/save/get_effective_weights) |
-| visualizer.py | 시각화 7종 (Sankey, 2D/3D 산점도, 히트맵, 평가, 기여도, 민감도) |
-| sensitivity.py | 81조합 민감도 분석 (장르/키워드/수치/텍스트 × 상/중/하) + 기여도 산출 |
+| visualizer.py | 시각화 7종 (4단계 Sankey, 2D/3D 산점도+PC기여도, 히트맵, 평가, 기여도, 민감도+클러스터정보) |
+| sensitivity.py | 81조합 민감도 분석 (4가중치 × 3수준 = 3⁴) + 기여도 산출 |
 | search.py | 자유 텍스트 검색 엔진 (장르/키워드 별칭 파싱 + 퍼지 매칭 + 텍스트 임베딩) |
 | optimizer.py | 시뮬레이티드 어닐링 가중치 최적화 (복합 목적함수, 신뢰도/정확도) |
 | dashboard.py | Dash 대시보드 5탭 (검색/클러스터/파라미터/평가/민감도), 탭 상태 보존, sticky 헤더 |
@@ -66,7 +66,8 @@ V = [L2norm(genre)*Wg | L2norm(keyword)*Wk | L2norm(numeric)*Wn | L2norm(text)*W
 | KMeans | centroid = mean(X[label==c]) | 군집화 |
 | PCA | X_reduced = (X-μ) @ V^T[:n] | 시각화 |
 | Spearman ρ | 1 - 6·Σd² / (n·(n²-1)) | 민감도 순위상관 |
-| 복합 점수 | 0.35·sim + 0.30·genre_prec + 0.25·text_coh - 0.10·\|div-0.3\| | 최적화 목적함수 |
+| 장르 Jaccard | mean(\|Q∩R_i\| / \|Q∪R_i\|) | 장르 정밀도 (교집합/합집합) |
+| 복합 점수 | 0.35·sim + 0.30·genre_jaccard + 0.25·text_coh - 0.10·\|div-0.3\| | 최적화 목적함수 |
 | 기여도 | max(μ_하,μ_중,μ_상) - min(μ_하,μ_중,μ_상) | 파라미터 영향력 |
 
 ## 가중치 최적화 (optimizer.py)

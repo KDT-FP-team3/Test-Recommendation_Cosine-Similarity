@@ -21,7 +21,6 @@ import numpy as np
 import dash
 from dash import html, dcc, Input, Output, State, callback_context, dash_table
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 import config
 
@@ -192,20 +191,28 @@ def _build_contribution_examples_panel(results):
 
     genre_dominant = []
     keyword_dominant = []
+    numeric_dominant = []
     text_dominant = []
 
     for r in candidates:
         gs = r["group_similarity"]
-        g, k, t = gs.get("genre", 0), gs.get("keyword", 0), gs.get("text", 0)
-        if g > k and g > t and g > 0.1:
+        g, k, n, t = gs.get("genre", 0), gs.get("keyword", 0), gs.get("numeric", 0), gs.get("text", 0)
+        vals = [g, k, n, t]
+        mx = max(vals)
+        if mx < 0.1:
+            continue
+        if g == mx:
             genre_dominant.append((r, g))
-        if k > g and k > t and k > 0.1:
+        elif k == mx:
             keyword_dominant.append((r, k))
-        if t > g and t > k and t > 0.1:
+        elif n == mx:
+            numeric_dominant.append((r, n))
+        elif t == mx:
             text_dominant.append((r, t))
 
     genre_dominant.sort(key=lambda x: -x[1])
     keyword_dominant.sort(key=lambda x: -x[1])
+    numeric_dominant.sort(key=lambda x: -x[1])
     text_dominant.sort(key=lambda x: -x[1])
 
     def _example_card(title, color, items, factor_label):
@@ -238,10 +245,11 @@ def _build_contribution_examples_panel(results):
 
     return html.Div(style={"marginTop": "20px"}, children=[
         html.H4("기여도별 예시", style={"marginBottom": "10px"}),
-        html.Div(style={"display": "flex", "gap": "12px"}, children=[
+        html.Div(style={"display": "grid", "gridTemplateColumns": "repeat(4, 1fr)", "gap": "12px"}, children=[
+            _example_card("텍스트 주도", "#2ECC71", text_dominant, "텍스트"),
+            _example_card("수치 주도", "#F39C12", numeric_dominant, "수치"),
             _example_card("장르 주도", "#E74C3C", genre_dominant, "장르"),
             _example_card("키워드 주도", "#3498DB", keyword_dominant, "키워드"),
-            _example_card("텍스트 주도", "#2ECC71", text_dominant, "텍스트"),
         ]),
     ])
 
@@ -298,7 +306,7 @@ def create_app():
         "backgroundColor": "#2c3e50", "color": "#fff", "padding": "16px 24px",
         "fontSize": "20px", "fontWeight": "bold",
         "position": "sticky", "top": "0", "zIndex": "1000",
-    }, children="KMDB 영화 추천 시스템 -- 코사인 유사도 기반 하이브리드 추천")
+    }, children="KMDB 영화 추천 시스템 -- 코사인 유사도 기반 추천")
 
     tabs = dcc.Tabs(id="main-tabs", value="tab-search", style={
         "position": "sticky", "top": "56px", "zIndex": "999",
@@ -330,7 +338,7 @@ def create_app():
         ]),
         html.Div(id="search-info", style={"marginBottom": "10px", "color": "#666"}),
         html.Div(id="search-results", style={
-            "display": "grid", "gridTemplateColumns": "repeat(3, 1fr)",
+            "display": "grid", "gridTemplateColumns": "repeat(4, 1fr)",
             "gap": "12px",
         }),
         html.Div(id="contribution-examples"),
@@ -372,10 +380,41 @@ def create_app():
                     text=[tm["title"]], name=f"테스트: {tm['title']}",
                 ))
 
+        # PC축별 그룹 기여도 라벨 생성
+        pc_axis_labels = ["PC1", "PC2", "PC3"]
+        pc_title_suffix = ""
+        reducer = result.get("reducer")
+        emb = result.get("embedding")
+        if reducer is not None and emb is not None:
+            components = reducer.get_components()
+            var_ratio = reducer.get_explained_variance()
+            if components is not None:
+                g_end = emb.genre_dim
+                k_end = g_end + emb.keyword_dim
+                n_end = k_end + emb.numeric_dim
+                t_end = n_end + emb.text_dim
+                grp_ranges = [(0, g_end), (g_end, k_end), (k_end, n_end), (n_end, t_end)]
+                for i in range(min(len(components), 3)):
+                    comp = components[i]
+                    contribs = [np.sum(comp[s:e] ** 2) for s, e in grp_ranges]
+                    total = sum(contribs)
+                    if total < 1e-10:
+                        continue
+                    pcts = " / ".join(f"{v/total:.0%}" for v in contribs)
+                    var_str = f"[{var_ratio[i]*100:.1f}%]" if var_ratio is not None and len(var_ratio) > i else ""
+                    pc_axis_labels[i] = f"PC{i+1} {var_str} ({pcts})"
+                pc_title_suffix = "<br><sub>PC축: [분산] (장르 / 키워드 / 수치 / 텍스트)</sub>"
+
         fig.update_layout(
-            title="3D 임베딩 공간 -- 클러스터 분포",
+            title=f"3D 임베딩 공간 -- 클러스터 분포{pc_title_suffix}",
             height=700,
-            scene=dict(xaxis_title="PC1", yaxis_title="PC2", zaxis_title="PC3"),
+            margin=dict(t=40, b=0, l=0, r=0),
+            legend=dict(font=dict(size=14)),
+            scene=dict(
+                xaxis_title=pc_axis_labels[0],
+                yaxis_title=pc_axis_labels[1],
+                zaxis_title=pc_axis_labels[2],
+            ),
         )
 
         cluster_info = result.get("cluster_info", {})
@@ -529,22 +568,58 @@ def create_app():
 
         if per_query:
             titles = list(per_query.keys())
-            short_titles = [t[:12] for t in titles]
-            metrics = ["avg_similarity", "genre_precision", "diversity", "text_coherence"]
-            labels = ["평균 유사도", "장르 정밀도", "다양성", "텍스트 일관성"]
-            colors = ["#3498DB", "#E74C3C", "#F1C40F", "#2ECC71"]
+            m_keys = ["avg_similarity", "genre_precision", "diversity", "text_coherence"]
+            m_labels = ["평균유사도", "장르정밀도", "다양성", "텍스트 일관성"]
+            m_base_colors = [
+                "52,152,219",   # 파랑 (평균유사도)
+                "231,76,60",    # 빨강 (장르정밀도)
+                "241,196,15",   # 노랑 (다양성)
+                "46,204,113",   # 초록 (텍스트 일관성)
+            ]
 
-            fig = make_subplots(rows=2, cols=2, subplot_titles=labels)
-            for i, (mn, ml) in enumerate(zip(metrics, labels)):
-                r, c = (i // 2) + 1, (i % 2) + 1
-                vals = [per_query[t].get(mn, 0) for t in titles]
-                fig.add_trace(go.Bar(
-                    x=short_titles, y=vals, marker_color=colors[i],
-                    text=[f"{v:.3f}" for v in vals], textposition="outside",
-                ), row=r, col=c)
-            fig.update_layout(showlegend=False, height=600)
+            detail_table_data = []
+            for t in titles:
+                row = {"영화": t}
+                for key, label in zip(m_keys, m_labels):
+                    row[label] = round(per_query[t].get(key, 0), 4)
+                detail_table_data.append(row)
+
+            # 열별 조건부 배경색 (값이 높을수록 진하게)
+            detail_style_cond = []
+            for col_idx, label in enumerate(m_labels):
+                vals = [row[label] for row in detail_table_data]
+                lo, hi = min(vals), max(vals)
+                if hi > lo:
+                    for row_idx, val in enumerate(vals):
+                        ratio = (val - lo) / (hi - lo)
+                        alpha = 0.12 + ratio * 0.48
+                        detail_style_cond.append({
+                            "if": {"column_id": label, "row_index": row_idx},
+                            "backgroundColor": f"rgba({m_base_colors[col_idx]},{alpha:.2f})",
+                            "fontWeight": "bold" if ratio >= 0.75 else "normal",
+                        })
+
+            detail_table_cols = [
+                {"name": "영화", "id": "영화", "type": "text"},
+            ] + [
+                {"name": l, "id": l, "type": "numeric", "format": {"specifier": ".4f"}}
+                for l in m_labels
+            ]
+
+            detail_table = dash_table.DataTable(
+                columns=detail_table_cols,
+                data=detail_table_data,
+                style_cell={"textAlign": "center", "padding": "10px", "fontSize": "14px"},
+                style_header={"backgroundColor": "#2c3e50", "color": "#fff",
+                              "fontWeight": "bold", "fontSize": "14px"},
+                style_cell_conditional=[
+                    {"if": {"column_id": "영화"}, "textAlign": "left", "fontWeight": "bold",
+                     "minWidth": "160px"},
+                ],
+                style_data_conditional=detail_style_cond,
+            )
         else:
-            fig = go.Figure()
+            detail_table = html.Div()
 
         adequacy = comparison.get("adequacy", {})
         adequacy_items = []
@@ -554,7 +629,7 @@ def create_app():
             reasons = adeq.get("reasons", [])
             adequacy_items.append(html.Div(style={
                 "padding": "8px 12px", "borderLeft": f"4px solid {color}",
-                "marginBottom": "8px", "backgroundColor": "#fff",
+                "backgroundColor": "#fff",
             }, children=[
                 html.Span(f"[{status}] ", style={"color": color, "fontWeight": "bold"}),
                 html.Span(title),
@@ -566,10 +641,11 @@ def create_app():
             html.H4("전체 평균 지표"),
             html.Div(style={"display": "grid", "gridTemplateColumns": "repeat(5, 1fr)",
                              "gap": "12px", "marginBottom": "20px"}, children=overall_cards),
-            html.H4("영화별 상세 지표"),
-            dcc.Graph(figure=fig),
+            html.H4("영화별 상세 지표", style={"marginBottom": "10px"}),
+            detail_table,
             html.H4("적합/부적합 판정"),
-            html.Div(children=adequacy_items),
+            html.Div(style={"display": "grid", "gridTemplateColumns": "repeat(2, 1fr)",
+                             "gap": "8px"}, children=adequacy_items),
         ]
 
     tab_eval_content = html.Div(id="tab-eval-div",
@@ -665,9 +741,8 @@ def create_app():
             info_parts.append(f"파싱 장르: {', '.join(parsed['genres'])}")
         if stype == "text" and parsed.get("keywords"):
             info_parts.append(f"파싱 키워드: {', '.join(parsed['keywords'])}")
-        if parsed.get("corrections"):
-            corrections = parsed["corrections"]
-            corr_str = ", ".join(f"{c['original']}→{c['corrected']}" for c in corrections)
+        if parsed.get("fuzzy_corrections"):
+            corr_str = ", ".join(f"{orig}→{corrected}" for orig, corrected in parsed["fuzzy_corrections"])
             info_parts.append(f"오타 교정: {corr_str}")
         info_parts.append(f"결과: {len(results)}편")
 
@@ -693,8 +768,11 @@ def create_app():
         emb = result["embedding"]
         new_raw = emb.rebuild_with_weights(w_genre=wg, w_keyword=wk,
                                             w_numeric=wn, w_text=wt)
-        old_raw = emb.raw_vectors
         emb.raw_vectors = new_raw
+        emb.w_genre = wg
+        emb.w_keyword = wk
+        emb.w_numeric = wn
+        emb.w_text = wt
 
         train_ids = [m["id"] for m in result["train_movies"]]
         children = []
@@ -719,7 +797,7 @@ def create_app():
 
             children.append(html.Div(style={
                 "backgroundColor": "#fff", "borderRadius": "8px", "padding": "12px",
-                "marginBottom": "12px", "boxShadow": "0 1px 3px rgba(0,0,0,0.08)",
+                "boxShadow": "0 1px 3px rgba(0,0,0,0.08)",
             }, children=[
                 html.H4(f"{tm['title']} ({tm['year']})", style={"margin": "0 0 8px 0"}),
                 html.Div(f"기준선 대비 오버랩: {overlap}/{config.TOP_K} ({overlap_pct:.0f}%)",
@@ -730,10 +808,11 @@ def create_app():
                           style={"fontSize": "12px", "color": "#E74C3C"}),
             ]))
 
-        emb.raw_vectors = old_raw
-
         info = f"가중치: 장르={wg:.1f}, 키워드={wk:.1f}, 수치={wn:.1f}, 텍스트={wt:.1f}"
-        return children, info
+        grid = html.Div(style={
+            "display": "grid", "gridTemplateColumns": "repeat(2, 1fr)", "gap": "12px",
+        }, children=children)
+        return [grid], info
 
     # -- 초기화 버튼
     @app.callback(
@@ -747,7 +826,17 @@ def create_app():
     def reset_weights(n_clicks):
         if os.path.exists(config.SAVED_WEIGHTS_PATH):
             os.remove(config.SAVED_WEIGHTS_PATH)
-        return config.WEIGHT_GENRE, config.WEIGHT_KEYWORD, config.WEIGHT_NUMERIC, config.WEIGHT_TEXT
+
+        wg, wk, wn, wt = (config.WEIGHT_GENRE, config.WEIGHT_KEYWORD,
+                           config.WEIGHT_NUMERIC, config.WEIGHT_TEXT)
+        emb = result["embedding"]
+        emb.raw_vectors = emb.rebuild_with_weights(
+            w_genre=wg, w_keyword=wk, w_numeric=wn, w_text=wt)
+        emb.w_genre = wg
+        emb.w_keyword = wk
+        emb.w_numeric = wn
+        emb.w_text = wt
+        return wg, wk, wn, wt
 
     # -- 되돌리기 버튼
     @app.callback(
@@ -760,7 +849,16 @@ def create_app():
     )
     def undo_weights(n_clicks):
         prev = _weight_state["previous"]
-        return prev["genre"], prev["keyword"], prev["numeric"], prev["text"]
+        wg, wk, wn, wt = prev["genre"], prev["keyword"], prev["numeric"], prev["text"]
+
+        emb = result["embedding"]
+        emb.raw_vectors = emb.rebuild_with_weights(
+            w_genre=wg, w_keyword=wk, w_numeric=wn, w_text=wt)
+        emb.w_genre = wg
+        emb.w_keyword = wk
+        emb.w_numeric = wn
+        emb.w_text = wt
+        return wg, wk, wn, wt
 
     # -- 시뮬레이션 시작
     @app.callback(
@@ -998,6 +1096,18 @@ def create_app():
             accuracy=_sim_state["accuracy"],
             score=_sim_state["best_score"],
         )
+
+        emb = result["embedding"]
+        new_raw = emb.rebuild_with_weights(
+            w_genre=bw["genre"], w_keyword=bw["keyword"],
+            w_numeric=bw["numeric"], w_text=bw["text"],
+        )
+        emb.raw_vectors = new_raw
+        emb.w_genre = bw["genre"]
+        emb.w_keyword = bw["keyword"]
+        emb.w_numeric = bw["numeric"]
+        emb.w_text = bw["text"]
+
         return bw["genre"], bw["keyword"], bw["numeric"], bw["text"]
 
     # -- 민감도: 버튼 클릭 -> 백그라운드 분석 시작 + Interval 활성화
@@ -1141,7 +1251,7 @@ def create_app():
 
         # ---- 상세 테이블 (유사도 내림차순 + 색상) ----
         # 수준별 배경색: 상=파랑, 중=초록, 하=주황
-        _LEVEL_BG = {"상": "rgba(41,128,185,0.25)", "중": "rgba(39,174,96,0.20)", "하": "rgba(230,126,34,0.25)"}
+        _LEVEL_BG = {"상": "rgba(41,128,185,0.25)", "중": "rgba(39,174,96,0.20)", "하": "rgba(231,76,60,0.25)"}
 
         sorted_analysis = sorted(analysis, key=lambda a: a.get("avg_similarity", 0), reverse=True)
         table_data = []
@@ -1206,23 +1316,37 @@ def create_app():
         ]
 
         results_children = [
-            html.H4("파라미터 기여도 순위", style={"marginBottom": "10px"}),
-            dcc.Graph(figure=imp_fig),
+            # 1행: 기여도 순위 (1열) + 상세 결과표 (2열)
             html.Div(style={
-                "display": "grid", "gridTemplateColumns": "repeat(4, 1fr)",
-                "gap": "12px", "marginBottom": "20px",
-            }, children=imp_cards),
+                "display": "grid", "gridTemplateColumns": "1fr 1fr",
+                "gap": "20px", "marginBottom": "20px",
+            }, children=[
+                # 1열: 기여도 순위
+                html.Div(children=[
+                    html.H4("파라미터 기여도 순위", style={"marginBottom": "10px"}),
+                    dcc.Graph(figure=imp_fig, config={"displayModeBar": False}),
+                    html.Div(style={
+                        "display": "grid", "gridTemplateColumns": "repeat(2, 1fr)",
+                        "gap": "10px",
+                    }, children=imp_cards),
+                ]),
+                # 2열: 상세 결과표
+                html.Div(children=[
+                    html.H4("상세 결과 (상위 50건, 유사도 내림차순)", style={"marginBottom": "10px"}),
+                    dash_table.DataTable(
+                        columns=table_columns,
+                        data=table_data,
+                        style_cell={"textAlign": "left", "padding": "8px", "fontSize": "13px"},
+                        style_header={"backgroundColor": "#2c3e50", "color": "#fff",
+                                      "fontSize": "14px", "fontWeight": "bold"},
+                        style_data_conditional=style_conditions,
+                        page_size=15,
+                        sort_action="native",
+                    ),
+                ]),
+            ]),
+            # 2행: 81조합 Top-20 히트맵
             dcc.Graph(figure=fig),
-            html.H4("상세 결과 (상위 50건, 유사도 내림차순)", style={"marginTop": "20px"}),
-            dash_table.DataTable(
-                columns=table_columns,
-                data=table_data,
-                style_cell={"textAlign": "left", "padding": "6px", "fontSize": "12px"},
-                style_header={"backgroundColor": "#2c3e50", "color": "#fff"},
-                style_data_conditional=style_conditions,
-                page_size=20,
-                sort_action="native",
-            ),
         ]
 
         return (
